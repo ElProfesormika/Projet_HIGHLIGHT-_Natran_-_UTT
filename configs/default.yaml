@@ -1,0 +1,127 @@
+# Configuration par défaut pour HIGHLIGHT+
+# Système de détection intelligente de micro-fuites de méthane
+
+# === PARAMÈTRES PHYSIQUES ===
+physics:
+  # Source de fuite
+  leak_source:
+    x: 50.0          # Position X de la fuite (m)
+    y: 50.0          # Position Y de la fuite (m)
+    intensity: 1.0   # Intensité de la fuite (kg/s)
+  
+  # Conditions environnementales
+  environment:
+    wind_speed: 2.0      # Vitesse du vent (m/s)
+    wind_direction: 45   # Direction du vent (degrés)
+    temperature: 288.15  # Température (K)
+    pressure: 101325     # Pression (Pa)
+    humidity: 0.6        # Humidité relative
+  
+  # Paramètres de diffusion
+  diffusion:
+    sigma_x: 5.0     # Écart-type diffusion X (m)
+    sigma_y: 3.0     # Écart-type diffusion Y (m)
+    decay_rate: 0.01 # Taux de décroissance
+
+# === CAPTEUR TDLAS ===
+sensor:
+  noise_level: 0.1      # Niveau de bruit (σ)
+  detection_threshold: 0.05  # Seuil de détection
+  range_max: 100.0      # Portée maximale (m)
+  update_frequency: 10  # Fréquence de mise à jour (Hz)
+
+# === DRONE ===
+drone:
+  # Contraintes physiques
+  max_speed: 5.0        # Vitesse maximale (m/s)
+  max_altitude: 20.0    # Altitude maximale (m)
+  min_altitude: 2.0     # Altitude minimale (m)
+  
+  # Consommation énergétique
+  energy:
+    base_power: 100.0   # Puissance de base (W)
+    speed_coefficient: 50.0  # Coefficient vitesse
+    altitude_coefficient: 25.0  # Coefficient altitude
+
+# === ENVIRONNEMENT DE SIMULATION ===
+simulation:
+  # Dimensions de l'espace
+  world_size: [100, 100]  # [largeur, hauteur] en mètres
+  
+  # Paramètres temporels
+  time_step: 0.1      # Pas de temps (s)
+  max_steps: 1000     # Nombre maximum d'étapes
+  
+  # Conditions initiales
+  initial_position: [10, 10]  # Position initiale du drone
+  initial_altitude: 5.0       # Altitude initiale (m)
+
+# === MODÈLE TEACHER (GAUSSIAN PROCESS) ===
+teacher:
+  # Kernel GP
+  kernel:
+    type: "RBF"       # Type de kernel
+    length_scale: 10.0  # Échelle de longueur
+    variance: 1.0     # Variance
+  
+  # Hyperparamètres
+  alpha: 1e-3         # Régularisation
+  n_restarts: 10      # Nombre de redémarrages
+  
+  # Stratégie d'exploration
+  exploration:
+    acquisition_function: "UCB"  # Fonction d'acquisition
+    beta: 2.0         # Paramètre d'exploration UCB
+
+# === MODÈLE STUDENT (REINFORCEMENT LEARNING) ===
+student:
+  # Algorithme RL
+  algorithm: "PPO"    # PPO, SAC, TD3
+  
+  # Architecture du réseau
+  network:
+    hidden_layers: [256, 256, 128]
+    activation: "tanh"
+  
+  # Hyperparamètres d'entraînement
+  training:
+    total_timesteps: 100000
+    learning_rate: 3e-4
+    batch_size: 64
+    n_epochs: 10
+    
+  # Distillation de connaissance
+  distillation:
+    lambda_kl: 0.1    # Poids de la perte KL
+    temperature: 3.0  # Température de distillation
+
+# === FONCTION DE RÉCOMPENSE ===
+reward:
+  # Poids des composantes
+  alpha: 1.0          # Poids gain d'information
+  beta: 0.5           # Poids coût énergétique
+  gamma: 0.99         # Facteur de discount
+  
+  # Récompenses spécifiques
+  detection_bonus: 10.0    # Bonus pour détection
+  energy_penalty: -0.1     # Pénalité énergétique
+  boundary_penalty: -5.0   # Pénalité sortie zone
+
+# === EXPÉRIMENTATION ===
+experiment:
+  # Tests comparatifs
+  n_runs: 10          # Nombre de runs
+  save_trajectories: true
+  save_metrics: true
+  
+  # Visualisation
+  plot_frequency: 100  # Fréquence des plots
+  save_plots: true
+  
+  # Logging
+  log_level: "INFO"
+  tensorboard: true
+
+
+
+

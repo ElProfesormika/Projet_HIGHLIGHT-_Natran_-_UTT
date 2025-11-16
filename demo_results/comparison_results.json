@@ -1,0 +1,13 @@
+{
+  "teacher": {
+    "metrics": {
+      "detection_rate": 0.2736318407960199,
+      "total_distance": 100.76555923453128,
+      "energy_efficiency": 0.00011106423695705236,
+      "localization_accuracy": 0.01456689033020877,
+      "total_reward": -383.8277961726565,
+      "mission_time": 201,
+      "total_energy": 907272.7819081538
+    },
+    "trajectory": [
+      
