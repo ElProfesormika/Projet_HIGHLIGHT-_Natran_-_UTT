@@ -60,22 +60,32 @@ st.markdown("""
     /* === HEADER PRINCIPAL === */
     .main-header {
         background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
-        padding: 3rem 2rem;
+        padding: 4rem 2rem;
         border-radius: 0;
         margin: -1rem -1rem 2rem -1rem;
         box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
-        border-bottom: 3px solid #00d4ff;
+        border-bottom: 4px solid #00d4ff;
     }
     
     .main-title {
         color: #ffffff;
-        font-size: 3.5rem;
-        font-weight: 700;
-        letter-spacing: -1px;
+        font-size: 6.5rem;
+        font-weight: 900;
+        letter-spacing: 4px;
         margin: 0;
         text-align: center;
         text-transform: uppercase;
         font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        text-shadow: 
+            2px 2px 4px rgba(0, 0, 0, 1),
+            4px 4px 8px rgba(0, 0, 0, 0.9),
+            6px 6px 12px rgba(0, 0, 0, 0.8),
+            0 0 20px rgba(255, 255, 255, 0.9),
+            0 0 40px rgba(255, 255, 255, 0.7),
+            0 0 60px rgba(255, 255, 255, 0.5);
+        line-height: 1.1;
+        -webkit-text-stroke: 2px rgba(0, 0, 0, 0.5);
+        filter: drop-shadow(0 0 20px rgba(255, 255, 255, 0.8)) drop-shadow(0 0 40px rgba(255, 255, 255, 0.6));
     }
     
     .main-subtitle {
