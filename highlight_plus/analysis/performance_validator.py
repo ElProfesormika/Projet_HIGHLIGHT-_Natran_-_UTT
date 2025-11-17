@@ -64,8 +64,12 @@ class PerformanceValidator:
     """
     Valideur de performance pour HIGHLIGHT+
     
-    Compare les détections effectuées avec la position réelle de la fuite
-    et calcule des métriques de performance détaillées.
+    IMPORTANT: Ce module est utilisé UNIQUEMENT pour la validation et la comparaison.
+    Il compare les détections effectuées avec la position réelle de la fuite
+    pour calculer l'erreur et prouver la fiabilité du modèle aux observateurs.
+    
+    La position réelle n'est PAS utilisée dans l'estimation de position.
+    Elle est fournie uniquement pour permettre la validation des performances.
     """
     
     def __init__(self, true_leak_position: Tuple[float, float], 
@@ -74,6 +78,8 @@ class PerformanceValidator:
         """
         Args:
             true_leak_position: Position réelle de la fuite (x, y)
+                               UNIQUEMENT pour validation/comparaison.
+                               Cette position n'est PAS connue par le modèle d'estimation.
             tolerance_radius: Rayon de tolérance pour une détection valide (m)
             time_step: Pas de temps de la simulation (s)
         """

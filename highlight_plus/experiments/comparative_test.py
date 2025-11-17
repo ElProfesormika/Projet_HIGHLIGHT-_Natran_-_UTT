@@ -225,7 +225,7 @@ class ComparativeTester:
         """
         Test A : HIGHLIGHT+ avec architecture Teacher-Student
         """
-        print(f"🚁 Exécution de {n_runs} runs de HIGHLIGHT+...")
+        print(f"Execution de {n_runs} runs de HIGHLIGHT+...")
         
         detection_rates = []
         localizations = []
@@ -334,7 +334,7 @@ class ComparativeTester:
         Exécute tous les tests comparatifs
         """
         print("=" * 60)
-        print("🔬 TESTS COMPARATIFS HIGHLIGHT+")
+        print("TESTS COMPARATIFS HIGHLIGHT+")
         print("=" * 60)
         
         # Exécution des trois méthodes
@@ -413,12 +413,13 @@ if __name__ == "__main__":
     df_results = tester.run_full_comparison(n_runs=3, max_steps=200)
     
     print("\n" + "=" * 60)
-    print("📊 RÉSULTATS COMPARATIFS")
+    print("RESULTATS COMPARATIFS")
     print("=" * 60)
     print(df_results.to_string(index=False))
     
     # Visualisation
     tester.plot_comparison(save_path="comparison_results.png")
+
 
 
 

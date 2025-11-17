@@ -1,10 +1,10 @@
-# 🚁 HIGHLIGHT+ - Présentation Concours Innovation Natran x UTT
+# HIGHLIGHT+ - Presentation Concours Innovation Natran x UTT
 
-## 🎯 Vision du Projet
+## Vision du Projet
 
 **HIGHLIGHT+** est un système d'intelligence artificielle révolutionnaire qui transforme un drone-dirigeable en détective autonome de micro-fuites de méthane. Notre approche combine la rigueur de l'apprentissage actif avec l'efficacité énergétique d'un pilote automatique par apprentissage par renforcement profond.
 
-## 🧠 Innovation Technique
+## Innovation Technique
 
 ### Architecture Teacher-Student
 
@@ -34,7 +34,7 @@ où :
 - `E(s,a)` : Coût énergétique du mouvement
 - `α, β` : Poids d'équilibrage
 
-## 🏆 Résultats Clés (Simulation)
+## Résultats Clés (Simulation)
 
 | Métrique | Teacher (GP) | Student (RL) | Baseline Naïve | Amélioration |
 |----------|--------------|-------------|----------------|--------------|
@@ -54,179 +54,97 @@ où :
   - 5-10 m : 8% des cas
   - > 10 m : 2% des cas (échecs)
 
-## 🚀 Démonstration Technique
+## Démonstration Technique
 
-### Installation Rapide
+### Interface Streamlit
 
-```bash
-git clone https://github.com/your-username/highlight-plus.git
-cd highlight-plus
-pip install -r requirements.txt
-streamlit run streamlit_app.py
-```
+L'interface permet de :
+1. **Configurer** les paramètres du système (panache, capteur, drone, IA)
+2. **Définir** les positions de fuites à détecter
+3. **Lancer** la simulation avec validation automatique
+4. **Visualiser** les résultats en temps réel (générés dynamiquement)
+5. **Valider** la fiabilité : comparaison position réelle vs position détectée
 
-### Interface Utilisateur
-
-L'application Streamlit permet de :
-- ✅ Configurer toutes les variables (panache, capteur, drone, IA)
-- ✅ Choisir les positions de fuites à détecter
-- ✅ Lancer des simulations avec validation automatique
-- ✅ Visualiser les résultats en temps réel
-- ✅ Exporter les métriques de performance
-
-### Validation de Fiabilité
+### Preuve de Fiabilité
 
 Le système inclut une **validation automatique** qui :
-1. Compare la position détectée avec la position réelle configurée
-2. Calcule l'erreur de localisation
-3. Vérifie si la détection est dans la tolérance (10m)
-4. Génère un rapport détaillé avec toutes les métriques
+- Compare la position détectée avec la position réelle configurée
+- Calcule l'erreur de localisation (distance et angle)
+- Vérifie si la détection est dans la tolérance (10m par défaut)
+- Génère des rapports détaillés avec toutes les métriques
 
 **Pour prouver la fiabilité :**
-- Configurez une position de fuite dans l'interface
-- Lancez la simulation
-- Consultez les métriques de validation qui montrent la comparaison position réelle vs détectée
+1. Configurez une position de fuite dans l'interface (Onglet Configuration → Positions de Fuites)
+2. Lancez la simulation (Onglet Simulation)
+3. Le système détecte automatiquement cette position
+4. Consultez les métriques de validation dans l'onglet "Résultats & Métriques"
+5. Vérifiez la comparaison position réelle vs position détectée
 
-## 📊 Architecture du Système
+## Architecture
+
+### Composants Principaux
+
+1. **Modèle de Panache** : Simulation physique du panache de méthane
+2. **Capteur TDLAS** : Simulateur de capteur laser avec bruit réaliste
+3. **Environnement Gymnasium** : Environnement de simulation pour RL
+4. **Teacher (GP)** : Processus Gaussiens pour apprentissage actif
+5. **Student (RL)** : Réseau de neurones pour navigation optimale
+6. **Détecteur Amélioré** : Validation multi-critères des détections
+7. **Validateur GP** : Estimation de position de fuite par Processus Gaussien
+8. **Validateur de Performance** : Comparaison automatique des résultats
+
+### Flux de Données
 
 ```
-┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│   Expert        │    │   Apprenti      │    │   Validation    │
-│   (Teacher)     │───▶│   (Student)     │───▶│   Automatique   │
-│   Processus     │    │   RL + Distill  │    │   Performance   │
-│   Gaussiens     │    │   PyTorch       │    │   Position      │
-└─────────────────┘    └─────────────────┘    └─────────────────┘
-         │                       │                       │
-         ▼                       ▼                       ▼
-┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│   Apprentissage │    │   Entraînement  │    │   Interface    │
-│   Actif         │    │   Hors-ligne    │    │   Streamlit    │
-│   Maximisation  │    │   Buffer        │    │   Temps réel   │
-│   Information   │    │   Expérience    │    │   Visualisation│
-└─────────────────┘    └─────────────────┘    └─────────────────┘
+Configuration Utilisateur
+    ↓
+Simulation Environnement
+    ↓
+Mesures Capteur TDLAS
+    ↓
+Teacher (GP) → Prédiction + Exploration
+    ↓
+Student (RL) → Navigation + Apprentissage
+    ↓
+Détecteur Amélioré → Validation Multi-Critères
+    ↓
+Validateur GP → Estimation Position de Fuite (accumulation mesures)
+    ↓
+Validateur Performance → Comparaison Position Réelle vs Détectée
+    ↓
+Résultats + Métriques
 ```
 
-## 🎯 Impact Environnemental
+## Impact Environnemental
 
-### Problème Actuel
-- **Surveillance ponctuelle** des fuites de méthane
-- **Coût élevé** des inspections manuelles
-- **Détection tardive** des micro-fuites
-- **Impact environnemental** significatif
+- **Réduction des émissions** : Détection précoce des fuites
+- **Efficacité énergétique** : Optimisation des trajectoires
+- **Autonomie** : Système autonome sans intervention humaine
+- **Précision** : Localisation précise pour réparation ciblée
 
-### Solution HIGHLIGHT+
-- **Surveillance continue** et autonome
-- **Détection précoce** des micro-fuites
-- **Optimisation énergétique** des missions (-25% consommation)
-- **Réduction des coûts** opérationnels
-- **Précision élevée** (<2m d'erreur)
+## Feuille de Route
 
-## 🏗️ Feuille de Route
+### Phase 1 : Simulation (Actuel)
+- Validation de l'approche en simulation
+- Optimisation des paramètres
+- Tests de robustesse
 
-### Phase 0 (Concours - 2 mois) ✅
-- **Preuve de Concept** en simulation
-- **Démonstration** de l'architecture Teacher-Student
-- **Validation** des performances vs baselines
-- **Livrables** : Code open-source, documentation, interface Streamlit
+### Phase 2 : Prototype Terrain
+- Intégration avec drone réel
+- Tests en conditions réelles
+- Calibration des capteurs
 
-### Phase 1 (6 mois post-concours)
-- **Intégration matérielle** sur drone-dirigeable
-- **Validation** en conditions réelles
-- **Tests** de "libération contrôlée"
-- **Optimisation** pour temps réel
+### Phase 3 : Déploiement
+- Système opérationnel
+- Intégration avec infrastructure existante
+- Monitoring continu
 
-### Phase 2 (12 mois post-concours)
-- **Démonstration pilote** industrielle
-- **Partenariat** avec GRTgaz/Teréga
-- **Validation** du modèle économique
-- **Certification** pour utilisation commerciale
+## Équipe
 
-### Phase 3 (Vision 3 ans)
-- **Commercialisation** en "Inspection-as-a-Service"
-- **Déploiement** international
-- **Levée de fonds** Deep Tech/Climate Tech
-
-## 💡 Innovation et Différenciation
-
-### Approche Unique
-1. **Combinaison IA + Physique** : Modèle mathématique rigoureux + apprentissage
-2. **Architecture Teacher-Student** : Expertise + réactivité
-3. **Optimisation multi-objectifs** : Détection + énergie
-4. **Apprentissage actif** : Maximisation du gain d'information
-5. **Validation automatique** : Comparaison position réelle vs détectée
-
-### Avantages Concurrentiels
-- **Précision supérieure** : +25-40% vs trajectoires naïves
-- **Efficacité énergétique** : -25% de consommation
-- **Autonomie** : Missions sans intervention humaine
-- **Évolutivité** : Adaptation à différents environnements
-- **Fiabilité prouvée** : Validation automatique intégrée
-
-## 🎓 Équipe
-
-### Housséni YABRE - Lead AI Engineer
-- **Expertise** : Apprentissage par renforcement, Processus Gaussiens
-- **Rôle** : Architecture Teacher-Student, optimisation des algorithmes
-
-### Kabinet SYLLA - Simulation & Physics
-- **Expertise** : Modélisation physique, simulation numérique
-- **Rôle** : Modèle de panache, capteur TDLAS, environnement
-
-### Nobert Bassooma DIDANERA - System Integration
-- **Expertise** : Intégration système, déploiement
-- **Rôle** : Architecture logicielle, tests, validation
-
-## 🏆 Potentiel de Réussite
-
-### Marché
-- **Marché mondial** de la détection de gaz : 2.5B$ (2024)
-- **Croissance** : +8.5% par an
-- **Demande** : Réglementations environnementales strictes
-
-### Modèle Économique
-- **Inspection-as-a-Service** : 500-2000€/mission
-- **ROI client** : 3-6 mois
-- **Marge** : 60-80%
-
-### Partenaires Potentiels
-- **GRTgaz, Teréga** : Opérateurs de transport
-- **TotalEnergies, Shell** : Producteurs
-- **ADEME, Bpifrance** : Financement innovation
-
-## ⚠️ Limitations et Transparence
-
-### Résultats en Simulation
-- ⚠️ **Tous les tests sont en simulation**
-- ⚠️ Pas de validation sur données réelles de terrain (Phase 1)
-- ⚠️ Modèle de panache simplifié (Gaussien 2D)
-- ⚠️ Capteur TDLAS simulé (bruit modélisé)
-
-### Hypothèses du Modèle
-- Modèle 2D simplifié (pas de variation verticale complexe)
-- Conditions météorologiques fixes
-- Environnement contrôlé (pas d'obstacles)
-
-### Prochaines Étapes
-- Validation sur données réelles (Phase 1)
-- Tests de robustesse terrain
-- Adaptation aux conditions variables
-- Optimisation pour temps réel
-
-## 🚀 Conclusion
-
-**HIGHLIGHT+** représente une **innovation de rupture** dans la surveillance environnementale, combinant :
-
-- ✅ **Excellence technique** : Architecture Teacher-Student unique
-- ✅ **Résultats mesurables** : +25-40% détection, <2m précision
-- ✅ **Validation automatique** : Système de preuve de fiabilité intégré
-- ✅ **Impact environnemental** : Détection précoce des fuites
-- ✅ **Viabilité économique** : Modèle "Inspection-as-a-Service"
-- ✅ **Équipe experte** : Compétences complémentaires
-- ✅ **Vision claire** : Feuille de route réaliste
-
-**HIGHLIGHT+ est prêt à révolutionner la détection de micro-fuites de méthane et à contribuer significativement à la transition énergétique.**
+- **Housséni YABRE** - Lead AI Engineer
+- **Kabinet SYLLA** - Simulation & Physics
+- **Nobert Bassooma DIDANERA** - System Integration
 
 ---
 
-*Développé avec passion pour l'innovation environnementale*  
 *Concours Innovation Natran x Fondation UTT - 2025*

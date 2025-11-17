@@ -28,11 +28,11 @@ class ComparativeAnalyzer:
     
     def run_comparison(self):
         """Exécuter les simulations comparatives"""
-        print("🔄 Exécution des simulations comparatives...")
+        print("Execution des simulations comparatives...")
         print(f"   {self.n_runs} runs par agent")
         
-        # Runs pour agent naïve
-        print("\n📊 Agent NAÏVE...")
+        # Runs pour agent naive
+        print("\nAgent NAIVE...")
         for i in range(self.n_runs):
             sim = SimpleSimulator(self.config, agent_type="naive")
             results = sim.run()
@@ -41,7 +41,7 @@ class ComparativeAnalyzer:
                 print(f"   Run {i+1}/{self.n_runs} - Détections: {results['n_detections']}")
         
         # Runs pour agent HIGHLIGHT+
-        print("\n📊 Agent HIGHLIGHT+...")
+        print("\nAgent HIGHLIGHT+...")
         for i in range(self.n_runs):
             sim = SimpleSimulator(self.config, agent_type="highlight")
             results = sim.run()
@@ -49,7 +49,7 @@ class ComparativeAnalyzer:
             if (i + 1) % 5 == 0:
                 print(f"   Run {i+1}/{self.n_runs} - Détections: {results['n_detections']}")
         
-        print("\n✅ Simulations terminées !")
+        print("\nSimulations terminees !")
     
     def compute_metrics(self) -> Dict:
         """
@@ -236,7 +236,7 @@ class ComparativeAnalyzer:
         
         plt.tight_layout()
         plt.savefig(save_path, dpi=300, bbox_inches='tight')
-        print(f"✅ Graphiques sauvegardés : {save_path}")
+        print(f"Graphiques sauvegardes : {save_path}")
         
         return fig
     
@@ -321,7 +321,7 @@ class ComparativeAnalyzer:
         
         anim = FuncAnimation(fig, animate, frames=max_steps, interval=50, blit=True)
         anim.save(save_path, writer='pillow', fps=20)
-        print(f"✅ Animation sauvegardée : {save_path}")
+        print(f"Animation sauvegardee : {save_path}")
         
         return anim
     
@@ -367,7 +367,7 @@ intelligente des trajectoires de drones de surveillance.
         with open(output_path, 'w', encoding='utf-8') as f:
             f.write(report)
         
-        print(f"✅ Rapport sauvegardé : {output_path}")
+        print(f"Rapport sauvegarde : {output_path}")
         return report
 
 
@@ -396,5 +396,5 @@ if __name__ == "__main__":
     # Génération du rapport
     analyzer.generate_report(metrics)
     
-    print("\n✅ Analyse comparative terminée !")
+    print("\nAnalyse comparative terminee !")
 

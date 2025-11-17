@@ -35,7 +35,7 @@ class HighlightPlusGUI:
     
     def __init__(self, root):
         self.root = root
-        self.root.title("🚁 HIGHLIGHT+ - Système de Détection Intelligente de Méthane")
+        self.root.title(" HIGHLIGHT+ - Système de Détection Intelligente de Méthane")
         self.root.geometry("1400x900")
         self.root.configure(bg='#f0f0f0')
         
@@ -83,7 +83,7 @@ class HighlightPlusGUI:
     def create_config_tab(self):
         """Crée l'onglet de configuration"""
         config_frame = ttk.Frame(self.notebook)
-        self.notebook.add(config_frame, text="⚙️ Configuration")
+        self.notebook.add(config_frame, text=" Configuration")
         
         # Notebook pour les sous-onglets de configuration
         config_notebook = ttk.Notebook(config_frame)
@@ -107,7 +107,7 @@ class HighlightPlusGUI:
     def create_plume_config_tab(self, parent):
         """Configuration du modèle de panache"""
         plume_frame = ttk.Frame(parent)
-        parent.add(plume_frame, text="🌪️ Panache")
+        parent.add(plume_frame, text=" Panache")
         
         # Variables
         self.config_vars['leak_x'] = tk.DoubleVar(value=50.0)
@@ -156,13 +156,13 @@ class HighlightPlusGUI:
         ttk.Entry(diff_frame, textvariable=self.config_vars['sigma_y'], width=10).grid(row=0, column=3, padx=5, pady=5)
         
         # Bouton de visualisation
-        ttk.Button(plume_frame, text="🎨 Visualiser le Panache", 
+        ttk.Button(plume_frame, text=" Visualiser le Panache", 
                   command=self.visualize_plume).pack(pady=10)
     
     def create_sensor_config_tab(self, parent):
         """Configuration du capteur TDLAS"""
         sensor_frame = ttk.Frame(parent)
-        parent.add(sensor_frame, text="📡 Capteur")
+        parent.add(sensor_frame, text=" Capteur")
         
         # Variables
         self.config_vars['noise_level'] = tk.DoubleVar(value=0.1)
@@ -193,7 +193,7 @@ class HighlightPlusGUI:
     def create_drone_config_tab(self, parent):
         """Configuration du drone"""
         drone_frame = ttk.Frame(parent)
-        parent.add(drone_frame, text="🚁 Drone")
+        parent.add(drone_frame, text=" Drone")
         
         # Variables
         self.config_vars['max_speed'] = tk.DoubleVar(value=5.0)
@@ -232,7 +232,7 @@ class HighlightPlusGUI:
     def create_ai_config_tab(self, parent):
         """Configuration des modèles IA"""
         ai_frame = ttk.Frame(parent)
-        parent.add(ai_frame, text="🧠 IA")
+        parent.add(ai_frame, text=" IA")
         
         # Variables
         self.config_vars['teacher_exploration'] = tk.DoubleVar(value=2.5)
@@ -280,7 +280,7 @@ class HighlightPlusGUI:
     def create_simulation_tab(self):
         """Crée l'onglet de simulation"""
         sim_frame = ttk.Frame(self.notebook)
-        self.notebook.add(sim_frame, text="🚀 Simulation")
+        self.notebook.add(sim_frame, text=" Simulation")
         
         # Contrôles de simulation
         control_frame = ttk.LabelFrame(sim_frame, text="Contrôles de Simulation")
@@ -290,18 +290,18 @@ class HighlightPlusGUI:
         button_frame = ttk.Frame(control_frame)
         button_frame.pack(pady=10)
         
-        self.start_button = ttk.Button(button_frame, text="▶️ Démarrer Simulation", 
+        self.start_button = ttk.Button(button_frame, text="▶ Démarrer Simulation", 
                                       command=self.start_simulation)
         self.start_button.pack(side='left', padx=5)
         
-        self.stop_button = ttk.Button(button_frame, text="⏹️ Arrêter", 
+        self.stop_button = ttk.Button(button_frame, text="⏹ Arrêter", 
                                      command=self.stop_simulation, state='disabled')
         self.stop_button.pack(side='left', padx=5)
         
-        ttk.Button(button_frame, text="💾 Sauvegarder Config", 
+        ttk.Button(button_frame, text=" Sauvegarder Config", 
                   command=self.save_config).pack(side='left', padx=5)
         
-        ttk.Button(button_frame, text="📂 Charger Config", 
+        ttk.Button(button_frame, text=" Charger Config", 
                   command=self.load_config).pack(side='left', padx=5)
         
         # Barre de progression
@@ -320,16 +320,16 @@ class HighlightPlusGUI:
     def create_real_data_tab(self):
         """Crée l'onglet de données réelles"""
         data_frame = ttk.Frame(self.notebook)
-        self.notebook.add(data_frame, text="📊 Données Réelles")
+        self.notebook.add(data_frame, text=" Données Réelles")
         
         # Chargement de données
         load_frame = ttk.LabelFrame(data_frame, text="Chargement de Données")
         load_frame.pack(fill='x', padx=10, pady=10)
         
-        ttk.Button(load_frame, text="📂 Charger Fichier CSV", 
+        ttk.Button(load_frame, text=" Charger Fichier CSV", 
                   command=self.load_real_data).pack(pady=5)
         
-        ttk.Button(load_frame, text="🎲 Générer Données d'Exemple", 
+        ttk.Button(load_frame, text=" Générer Données d'Exemple", 
                   command=self.generate_sample_data).pack(pady=5)
         
         # Affichage des données
@@ -339,7 +339,7 @@ class HighlightPlusGUI:
     def create_results_tab(self):
         """Crée l'onglet de résultats"""
         results_frame = ttk.Frame(self.notebook)
-        self.notebook.add(results_frame, text="📈 Résultats")
+        self.notebook.add(results_frame, text=" Résultats")
         
         # Zone de visualisation
         self.results_frame = results_frame
@@ -348,16 +348,16 @@ class HighlightPlusGUI:
         control_frame = ttk.Frame(results_frame)
         control_frame.pack(fill='x', padx=10, pady=10)
         
-        ttk.Button(control_frame, text="📊 Afficher Résultats", 
+        ttk.Button(control_frame, text=" Afficher Résultats", 
                   command=self.display_results).pack(side='left', padx=5)
         
-        ttk.Button(control_frame, text="💾 Exporter Résultats", 
+        ttk.Button(control_frame, text=" Exporter Résultats", 
                   command=self.export_results).pack(side='left', padx=5)
     
     def create_leak_positions_tab(self, parent):
         """Configuration des positions de fuites multiples"""
         leak_frame = ttk.Frame(parent)
-        parent.add(leak_frame, text="📍 Positions Fuites")
+        parent.add(leak_frame, text=" Positions Fuites")
         
         # Interface
         ttk.Label(leak_frame, text="Configuration des Positions de Fuites", 
@@ -402,44 +402,44 @@ class HighlightPlusGUI:
         ttk.Entry(control_frame, textvariable=self.new_leak_intensity, width=8).grid(row=0, column=5, padx=2)
         
         # Boutons
-        ttk.Button(control_frame, text="➕ Ajouter", 
+        ttk.Button(control_frame, text=" Ajouter", 
                   command=self.add_leak_position).grid(row=0, column=6, padx=5)
-        ttk.Button(control_frame, text="🗑️ Supprimer", 
+        ttk.Button(control_frame, text=" Supprimer", 
                   command=self.remove_leak_position).grid(row=0, column=7, padx=5)
-        ttk.Button(control_frame, text="🎲 Positions Aléatoires", 
+        ttk.Button(control_frame, text=" Positions Aléatoires", 
                   command=self.generate_random_positions).grid(row=0, column=8, padx=5)
-        ttk.Button(control_frame, text="📂 Charger", 
+        ttk.Button(control_frame, text=" Charger", 
                   command=self.load_leak_positions).grid(row=0, column=9, padx=5)
-        ttk.Button(control_frame, text="💾 Sauvegarder", 
+        ttk.Button(control_frame, text=" Sauvegarder", 
                   command=self.save_leak_positions).grid(row=0, column=10, padx=5)
         
         # Positions prédéfinies
         preset_frame = ttk.LabelFrame(leak_frame, text="Positions Prédéfinies")
         preset_frame.pack(fill='x', padx=10, pady=5)
         
-        ttk.Button(preset_frame, text="🎯 Grille 3x3", 
+        ttk.Button(preset_frame, text=" Grille 3x3", 
                   command=lambda: self.load_preset_positions("grid_3x3")).pack(side='left', padx=2)
-        ttk.Button(preset_frame, text="🔀 Positions Aléatoires", 
+        ttk.Button(preset_frame, text=" Positions Aléatoires", 
                   command=lambda: self.load_preset_positions("random")).pack(side='left', padx=2)
-        ttk.Button(preset_frame, text="📐 Ligne", 
+        ttk.Button(preset_frame, text=" Ligne", 
                   command=lambda: self.load_preset_positions("line")).pack(side='left', padx=2)
-        ttk.Button(preset_frame, text="🔄 Cercle", 
+        ttk.Button(preset_frame, text=" Cercle", 
                   command=lambda: self.load_preset_positions("circle")).pack(side='left', padx=2)
     
     def create_learning_analysis_tab(self):
         """Crée l'onglet d'analyse d'apprentissage"""
         analysis_frame = ttk.Frame(self.notebook)
-        self.notebook.add(analysis_frame, text="🧠 Analyse Apprentissage")
+        self.notebook.add(analysis_frame, text=" Analyse Apprentissage")
         
         # Contrôles
         control_frame = ttk.LabelFrame(analysis_frame, text="Contrôles d'Analyse")
         control_frame.pack(fill='x', padx=10, pady=10)
         
-        ttk.Button(control_frame, text="📊 Analyser Apprentissage", 
+        ttk.Button(control_frame, text=" Analyser Apprentissage", 
                   command=self.run_learning_analysis).pack(side='left', padx=5)
-        ttk.Button(control_frame, text="📈 Afficher Courbes", 
+        ttk.Button(control_frame, text=" Afficher Courbes", 
                   command=self.show_learning_curves).pack(side='left', padx=5)
-        ttk.Button(control_frame, text="🔄 Réinitialiser", 
+        ttk.Button(control_frame, text=" Réinitialiser", 
                   command=self.reset_learning_analysis).pack(side='left', padx=5)
         
         # Métriques en temps réel
@@ -479,17 +479,17 @@ class HighlightPlusGUI:
     def create_position_test_tab(self):
         """Crée l'onglet de test de positions"""
         test_frame = ttk.Frame(self.notebook)
-        self.notebook.add(test_frame, text="🎯 Test Positions")
+        self.notebook.add(test_frame, text=" Test Positions")
         
         # Contrôles
         control_frame = ttk.LabelFrame(test_frame, text="Contrôles de Test")
         control_frame.pack(fill='x', padx=10, pady=10)
         
-        ttk.Button(control_frame, text="🚀 Lancer Test Complet", 
+        ttk.Button(control_frame, text=" Lancer Test Complet", 
                   command=self.run_position_test).pack(side='left', padx=5)
-        ttk.Button(control_frame, text="📊 Afficher Résultats", 
+        ttk.Button(control_frame, text=" Afficher Résultats", 
                   command=self.show_position_results).pack(side='left', padx=5)
-        ttk.Button(control_frame, text="📈 Graphiques Comparatifs", 
+        ttk.Button(control_frame, text=" Graphiques Comparatifs", 
                   command=self.show_comparison_charts).pack(side='left', padx=5)
         
         # Configuration du test
@@ -543,8 +543,8 @@ class HighlightPlusGUI:
     
     def setup_default_values(self):
         """Configure les valeurs par défaut"""
-        self.log("🚁 HIGHLIGHT+ - Interface graphique initialisée")
-        self.log("✅ Tous les composants sont prêts")
+        self.log(" HIGHLIGHT+ - Interface graphique initialisée")
+        self.log("[OK] Tous les composants sont prêts")
     
     def log(self, message):
         """Ajoute un message au log"""
@@ -591,11 +591,11 @@ class HighlightPlusGUI:
             # Affichage dans une nouvelle fenêtre
             plt.show()
             
-            self.log("✅ Visualisation du panache générée")
+            self.log("[OK] Visualisation du panache générée")
             
         except Exception as e:
             messagebox.showerror("Erreur", f"Erreur lors de la visualisation: {e}")
-            self.log(f"❌ Erreur: {e}")
+            self.log(f"[NON] Erreur: {e}")
     
     def start_simulation(self):
         """Démarre la simulation"""
@@ -618,7 +618,7 @@ class HighlightPlusGUI:
             self.start_time = time.time()
             self.current_step = 0
             
-            self.log("🚀 Démarrage de la simulation HIGHLIGHT+...")
+            self.log(" Démarrage de la simulation HIGHLIGHT+...")
             self.log("=" * 60)
             
             # Configuration de l'environnement
@@ -649,20 +649,20 @@ class HighlightPlusGUI:
                 update_frequency=self.config_vars['update_frequency'].get()
             )
             
-            self.log("📋 Configuration de la simulation:")
-            self.log(f"   🌪️ Panache: Position ({plume_config.leak_x:.1f}, {plume_config.leak_y:.1f}), Intensité {plume_config.leak_intensity:.3f} kg/s")
-            self.log(f"   🌬️ Vent: {plume_config.wind_speed:.1f} m/s, Direction {plume_config.wind_direction:.1f}°")
-            self.log(f"   📡 Capteur: Seuil {sensor_config.detection_threshold:.3f} kg/m³, Bruit {sensor_config.noise_level:.2f}")
-            self.log(f"   🚁 Drone: Position initiale ({env_config.initial_position[0]:.1f}, {env_config.initial_position[1]:.1f})")
-            self.log(f"   ⏱️ Durée: {env_config.max_steps} étapes maximum")
+            self.log(" Configuration de la simulation:")
+            self.log(f"    Panache: Position ({plume_config.leak_x:.1f}, {plume_config.leak_y:.1f}), Intensité {plume_config.leak_intensity:.3f} kg/s")
+            self.log(f"    Vent: {plume_config.wind_speed:.1f} m/s, Direction {plume_config.wind_direction:.1f}°")
+            self.log(f"    Capteur: Seuil {sensor_config.detection_threshold:.3f} kg/m³, Bruit {sensor_config.noise_level:.2f}")
+            self.log(f"    Drone: Position initiale ({env_config.initial_position[0]:.1f}, {env_config.initial_position[1]:.1f})")
+            self.log(f"   ⏱ Durée: {env_config.max_steps} étapes maximum")
             
             # Création de l'environnement
             env = MethaneDetectionEnv(env_config, plume_config, sensor_config)
-            self.log("✅ Environnement de simulation créé")
+            self.log("[OK] Environnement de simulation créé")
             
             # Initialisation
             obs, info = env.reset()
-            self.log(f"✅ Environnement initialisé - Position: {info['position']}")
+            self.log(f"[OK] Environnement initialisé - Position: {info['position']}")
             
             # Variables de performance
             total_reward = 0
@@ -678,12 +678,12 @@ class HighlightPlusGUI:
             
             # Mode de simulation
             simulation_mode = self.config_vars['simulation_mode'].get()
-            self.log(f"🎯 Mode de simulation: {simulation_mode}")
+            self.log(f" Mode de simulation: {simulation_mode}")
             
             # Simulation
             for step in range(self.config_vars['max_steps'].get()):
                 if not self.simulation_running:
-                    self.log("⏹️ Simulation arrêtée par l'utilisateur")
+                    self.log("⏹ Simulation arrêtée par l'utilisateur")
                     break
                 
                 self.current_step = step
@@ -717,7 +717,7 @@ class HighlightPlusGUI:
                     if concentration > sensor_config.detection_threshold:
                         detection_count += 1
                         learning_metrics['detection_history'].append(step)
-                        self.log(f"🎯 DÉTECTION à l'étape {step}: Concentration {concentration:.4f} kg/m³ à la position {info['position'][:2]}")
+                        self.log(f" DÉTECTION à l'étape {step}: Concentration {concentration:.4f} kg/m³ à la position {info['position'][:2]}")
                 
                 # Mise à jour des métriques d'apprentissage
                 learning_metrics['reward_history'].append(reward)
@@ -729,7 +729,7 @@ class HighlightPlusGUI:
                 
                 # Logs détaillés
                 if step % 25 == 0 or concentration > sensor_config.detection_threshold:
-                    self.log(f"📊 Étape {step:3d}: Reward={reward:6.3f}, Position=({info['position'][0]:5.1f}, {info['position'][1]:5.1f}), "
+                    self.log(f" Étape {step:3d}: Reward={reward:6.3f}, Position=({info['position'][0]:5.1f}, {info['position'][1]:5.1f}), "
                             f"Concentration={concentration:.4f} kg/m³, Énergie={energy_consumed:6.1f}J")
                 
                 # Mise à jour du statut
@@ -738,7 +738,7 @@ class HighlightPlusGUI:
                                   f"Temps: {elapsed_time:.1f}s - Détections: {detection_count}")
                 
                 if terminated or truncated:
-                    self.log(f"✅ Simulation terminée à l'étape {step}")
+                    self.log(f"[OK] Simulation terminée à l'étape {step}")
                     break
             
             # Calcul des métriques finales
@@ -762,35 +762,35 @@ class HighlightPlusGUI:
             
             # Logs de résultats
             self.log("=" * 60)
-            self.log("🎉 SIMULATION TERMINÉE AVEC SUCCÈS!")
-            self.log("📊 RÉSULTATS DÉTAILLÉS:")
-            self.log(f"   🎯 Détections: {detection_count} ({detection_rate:.1f}% du temps)")
-            self.log(f"   ⚡ Énergie consommée: {energy_consumed:.1f} J")
-            self.log(f"   🏆 Récompense totale: {total_reward:.3f}")
-            self.log(f"   ⏱️ Temps d'exécution: {total_time:.1f} secondes")
-            self.log(f"   📈 Concentration max: {max_concentration:.4f} kg/m³")
-            self.log(f"   🔋 Efficacité énergétique: {energy_efficiency:.2f} détections/kJ")
-            self.log(f"   📍 Position finale: ({info['position'][0]:.1f}, {info['position'][1]:.1f})")
+            self.log(" SIMULATION TERMINÉE AVEC SUCCÈS!")
+            self.log(" RÉSULTATS DÉTAILLÉS:")
+            self.log(f"    Détections: {detection_count} ({detection_rate:.1f}% du temps)")
+            self.log(f"    Énergie consommée: {energy_consumed:.1f} J")
+            self.log(f"    Récompense totale: {total_reward:.3f}")
+            self.log(f"   ⏱ Temps d'exécution: {total_time:.1f} secondes")
+            self.log(f"    Concentration max: {max_concentration:.4f} kg/m³")
+            self.log(f"    Efficacité énergétique: {energy_efficiency:.2f} détections/kJ")
+            self.log(f"    Position finale: ({info['position'][0]:.1f}, {info['position'][1]:.1f})")
             
             # Analyse de performance
             if detection_rate > 10:
-                self.log("✅ EXCELLENT: Taux de détection élevé!")
+                self.log("[OK] EXCELLENT: Taux de détection élevé!")
             elif detection_rate > 5:
-                self.log("⚠️ MOYEN: Taux de détection acceptable")
+                self.log("[ATTENTION] MOYEN: Taux de détection acceptable")
             else:
-                self.log("❌ FAIBLE: Taux de détection insuffisant")
+                self.log("[NON] FAIBLE: Taux de détection insuffisant")
             
             if energy_efficiency > 5:
-                self.log("✅ EXCELLENT: Efficacité énergétique élevée!")
+                self.log("[OK] EXCELLENT: Efficacité énergétique élevée!")
             elif energy_efficiency > 2:
-                self.log("⚠️ MOYEN: Efficacité énergétique acceptable")
+                self.log("[ATTENTION] MOYEN: Efficacité énergétique acceptable")
             else:
-                self.log("❌ FAIBLE: Efficacité énergétique insuffisante")
+                self.log("[NON] FAIBLE: Efficacité énergétique insuffisante")
             
             self.log("=" * 60)
             
         except Exception as e:
-            self.log(f"❌ ERREUR lors de la simulation: {e}")
+            self.log(f"[NON] ERREUR lors de la simulation: {e}")
             messagebox.showerror("Erreur", f"Erreur lors de la simulation: {e}")
         
         finally:
@@ -834,7 +834,7 @@ class HighlightPlusGUI:
     def stop_simulation(self):
         """Arrête la simulation"""
         self.simulation_running = False
-        self.log("⏹️ Arrêt de la simulation demandé")
+        self.log("⏹ Arrêt de la simulation demandé")
     
     def save_config(self):
         """Sauvegarde la configuration"""
@@ -851,7 +851,7 @@ class HighlightPlusGUI:
             if filename:
                 with open(filename, 'w') as f:
                     json.dump(config, f, indent=2)
-                self.log(f"✅ Configuration sauvegardée: {filename}")
+                self.log(f"[OK] Configuration sauvegardée: {filename}")
                 
         except Exception as e:
             messagebox.showerror("Erreur", f"Erreur lors de la sauvegarde: {e}")
@@ -871,7 +871,7 @@ class HighlightPlusGUI:
                     if key in self.config_vars:
                         self.config_vars[key].set(value)
                 
-                self.log(f"✅ Configuration chargée: {filename}")
+                self.log(f"[OK] Configuration chargée: {filename}")
                 
         except Exception as e:
             messagebox.showerror("Erreur", f"Erreur lors du chargement: {e}")
@@ -895,7 +895,7 @@ class HighlightPlusGUI:
                 self.data_display.insert(tk.END, f"Colonnes: {list(df.columns)}\n\n")
                 self.data_display.insert(tk.END, df.head(10).to_string())
                 
-                self.log(f"✅ Données réelles chargées: {len(df)} lignes")
+                self.log(f"[OK] Données réelles chargées: {len(df)} lignes")
                 
         except Exception as e:
             messagebox.showerror("Erreur", f"Erreur lors du chargement: {e}")
@@ -914,7 +914,7 @@ class HighlightPlusGUI:
             self.data_display.insert(tk.END, f"Concentration moyenne: {sample_data['ch4_concentration'].mean():.4f} kg/m³\n\n")
             self.data_display.insert(tk.END, sample_data.head(10).to_string())
             
-            self.log(f"✅ Données d'exemple générées: {len(sample_data)} points")
+            self.log(f"[OK] Données d'exemple générées: {len(sample_data)} points")
             
         except Exception as e:
             messagebox.showerror("Erreur", f"Erreur lors de la génération: {e}")
@@ -928,7 +928,7 @@ class HighlightPlusGUI:
         try:
             # Création d'une nouvelle fenêtre pour les résultats
             results_window = tk.Toplevel(self.root)
-            results_window.title("📈 Résultats de Simulation")
+            results_window.title(" Résultats de Simulation")
             results_window.geometry("800x600")
             
             # Création de la figure
@@ -981,7 +981,7 @@ class HighlightPlusGUI:
             canvas.draw()
             canvas.get_tk_widget().pack(fill='both', expand=True)
             
-            self.log("✅ Résultats affichés")
+            self.log("[OK] Résultats affichés")
             
         except Exception as e:
             messagebox.showerror("Erreur", f"Erreur lors de l'affichage: {e}")
@@ -1020,7 +1020,7 @@ class HighlightPlusGUI:
                 with open(filename, 'w') as f:
                     json.dump(export_data, f, indent=2)
                 
-                self.log(f"✅ Résultats exportés: {filename}")
+                self.log(f"[OK] Résultats exportés: {filename}")
                 
         except Exception as e:
             messagebox.showerror("Erreur", f"Erreur lors de l'export: {e}")
@@ -1051,7 +1051,7 @@ class HighlightPlusGUI:
             # Mise à jour de l'affichage
             self.update_leak_tree()
             
-            self.log(f"✅ Position de fuite ajoutée: ({x:.1f}, {y:.1f}) - Intensité: {intensity:.3f}")
+            self.log(f"[OK] Position de fuite ajoutée: ({x:.1f}, {y:.1f}) - Intensité: {intensity:.3f}")
             
         except Exception as e:
             messagebox.showerror("Erreur", f"Erreur lors de l'ajout: {e}")
@@ -1072,7 +1072,7 @@ class HighlightPlusGUI:
             removed = self.leak_positions.pop(index)
             self.update_leak_tree()
             
-            self.log(f"🗑️ Position supprimée: ({removed['x']:.1f}, {removed['y']:.1f})")
+            self.log(f" Position supprimée: ({removed['x']:.1f}, {removed['y']:.1f})")
             
         except Exception as e:
             messagebox.showerror("Erreur", f"Erreur lors de la suppression: {e}")
@@ -1089,7 +1089,7 @@ class HighlightPlusGUI:
                 f"{pos['x']:.1f}",
                 f"{pos['y']:.1f}",
                 f"{pos['intensity']:.3f}",
-                "✅" if pos['active'] else "❌"
+                "[OK]" if pos['active'] else "[NON]"
             ))
     
     def generate_random_positions(self):
@@ -1107,7 +1107,7 @@ class HighlightPlusGUI:
                 })
             
             self.update_leak_tree()
-            self.log(f"🎲 {n_positions} positions aléatoires générées")
+            self.log(f" {n_positions} positions aléatoires générées")
             
         except Exception as e:
             messagebox.showerror("Erreur", f"Erreur lors de la génération: {e}")
@@ -1127,7 +1127,7 @@ class HighlightPlusGUI:
                         self.leak_positions.append({
                             'x': x, 'y': y, 'intensity': intensity, 'active': True
                         })
-                self.log("🎯 Grille 3x3 chargée (9 positions)")
+                self.log(" Grille 3x3 chargée (9 positions)")
                 
             elif preset_type == "random":
                 # Positions aléatoires
@@ -1142,7 +1142,7 @@ class HighlightPlusGUI:
                     self.leak_positions.append({
                         'x': x, 'y': y, 'intensity': intensity, 'active': True
                     })
-                self.log("📐 Ligne horizontale chargée (5 positions)")
+                self.log(" Ligne horizontale chargée (5 positions)")
                 
             elif preset_type == "circle":
                 # Cercle
@@ -1158,7 +1158,7 @@ class HighlightPlusGUI:
                     self.leak_positions.append({
                         'x': x, 'y': y, 'intensity': intensity, 'active': True
                     })
-                self.log("🔄 Cercle chargé (8 positions)")
+                self.log(" Cercle chargé (8 positions)")
             
             self.update_leak_tree()
             
@@ -1176,7 +1176,7 @@ class HighlightPlusGUI:
             if filename:
                 with open(filename, 'w') as f:
                     json.dump(self.leak_positions, f, indent=2)
-                self.log(f"💾 Positions sauvegardées: {filename}")
+                self.log(f" Positions sauvegardées: {filename}")
                 
         except Exception as e:
             messagebox.showerror("Erreur", f"Erreur lors de la sauvegarde: {e}")
@@ -1192,7 +1192,7 @@ class HighlightPlusGUI:
                 with open(filename, 'r') as f:
                     self.leak_positions = json.load(f)
                 self.update_leak_tree()
-                self.log(f"📂 Positions chargées: {filename}")
+                self.log(f" Positions chargées: {filename}")
                 
         except Exception as e:
             messagebox.showerror("Erreur", f"Erreur lors du chargement: {e}")
@@ -1202,13 +1202,13 @@ class HighlightPlusGUI:
     def run_learning_analysis(self):
         """Lance l'analyse d'apprentissage"""
         try:
-            self.log_analysis("🧠 Démarrage de l'analyse d'apprentissage...")
+            self.log_analysis(" Démarrage de l'analyse d'apprentissage...")
             
             # Création de l'analyseur
             analyzer = LearningAnalyzer()
             
             # Simulation d'un apprentissage
-            self.log_analysis("📊 Simulation d'un apprentissage de 1000 étapes...")
+            self.log_analysis(" Simulation d'un apprentissage de 1000 étapes...")
             
             # Simulation des données d'apprentissage
             steps = 1000
@@ -1257,14 +1257,14 @@ class HighlightPlusGUI:
                 'analysis_results': analysis_results
             }
             
-            self.log_analysis("✅ Analyse d'apprentissage terminée")
-            self.log_analysis(f"📈 Convergence: étape {analysis_results['convergence_step']}")
-            self.log_analysis(f"🎯 Première détection: étape {analysis_results['first_detection']}")
-            self.log_analysis(f"📊 Taux de détection: {analysis_results['detection_rate']:.1%}")
-            self.log_analysis(f"⚡ Efficacité: {analysis_results['learning_efficiency']:.3f}")
+            self.log_analysis("[OK] Analyse d'apprentissage terminée")
+            self.log_analysis(f" Convergence: étape {analysis_results['convergence_step']}")
+            self.log_analysis(f" Première détection: étape {analysis_results['first_detection']}")
+            self.log_analysis(f" Taux de détection: {analysis_results['detection_rate']:.1%}")
+            self.log_analysis(f" Efficacité: {analysis_results['learning_efficiency']:.3f}")
             
         except Exception as e:
-            self.log_analysis(f"❌ Erreur lors de l'analyse: {e}")
+            self.log_analysis(f"[NON] Erreur lors de l'analyse: {e}")
             messagebox.showerror("Erreur", f"Erreur lors de l'analyse: {e}")
     
     def show_learning_curves(self):
@@ -1276,7 +1276,7 @@ class HighlightPlusGUI:
         try:
             # Création d'une nouvelle fenêtre
             curves_window = tk.Toplevel(self.root)
-            curves_window.title("📈 Courbes d'Apprentissage")
+            curves_window.title(" Courbes d'Apprentissage")
             curves_window.geometry("1000x700")
             
             # Création des graphiques
@@ -1325,7 +1325,7 @@ Seuil effectif: {results['effective_threshold']:.4f} kg/m³
             canvas.draw()
             canvas.get_tk_widget().pack(fill='both', expand=True)
             
-            self.log_analysis("✅ Courbes d'apprentissage affichées")
+            self.log_analysis("[OK] Courbes d'apprentissage affichées")
             
         except Exception as e:
             messagebox.showerror("Erreur", f"Erreur lors de l'affichage: {e}")
@@ -1336,7 +1336,7 @@ Seuil effectif: {results['effective_threshold']:.4f} kg/m³
         for var in self.metrics_vars.values():
             var.set("N/A")
         self.analysis_display.delete(1.0, tk.END)
-        self.log_analysis("🔄 Analyse d'apprentissage réinitialisée")
+        self.log_analysis(" Analyse d'apprentissage réinitialisée")
     
     # === Méthodes pour le test de positions ===
     
@@ -1347,14 +1347,14 @@ Seuil effectif: {results['effective_threshold']:.4f} kg/m³
                 messagebox.showwarning("Attention", "Configurez d'abord des positions de fuites")
                 return
             
-            self.log_test("🚀 Démarrage du test de positions...")
+            self.log_test(" Démarrage du test de positions...")
             
             # Configuration du test
             iterations = self.test_vars['test_iterations'].get()
             steps = self.test_vars['test_steps'].get()
             mode = self.test_vars['test_mode'].get()
             
-            self.log_test(f"📋 Configuration: {iterations} itérations, {steps} étapes, mode {mode}")
+            self.log_test(f" Configuration: {iterations} itérations, {steps} étapes, mode {mode}")
             
             # Création du testeur
             tester = LeakPositionTester()
@@ -1368,7 +1368,7 @@ Seuil effectif: {results['effective_threshold']:.4f} kg/m³
                 if not leak_pos['active']:
                     continue
                 
-                self.log_test(f"🎯 Test position {i+1}: ({leak_pos['x']:.1f}, {leak_pos['y']:.1f})")
+                self.log_test(f" Test position {i+1}: ({leak_pos['x']:.1f}, {leak_pos['y']:.1f})")
                 
                 # Simulation du test
                 total_detections = 0
@@ -1395,7 +1395,7 @@ Seuil effectif: {results['effective_threshold']:.4f} kg/m³
                 avg_precision = total_precision / iterations
                 
                 # Statut
-                status = "✅ Réussi" if avg_precision > 85 else "⚠️ Partiel" if avg_precision > 70 else "❌ Échec"
+                status = "[OK] Réussi" if avg_precision > 85 else "[ATTENTION] Partiel" if avg_precision > 70 else "[NON] Échec"
                 
                 # Ajout au tableau
                 self.test_tree.insert('', 'end', values=(
@@ -1407,12 +1407,12 @@ Seuil effectif: {results['effective_threshold']:.4f} kg/m³
                     status
                 ))
                 
-                self.log_test(f"   📊 Résultats: {avg_detections:.1f} détections, {avg_precision:.1f}% précision")
+                self.log_test(f"    Résultats: {avg_detections:.1f} détections, {avg_precision:.1f}% précision")
             
-            self.log_test("✅ Test de positions terminé")
+            self.log_test("[OK] Test de positions terminé")
             
         except Exception as e:
-            self.log_test(f"❌ Erreur lors du test: {e}")
+            self.log_test(f"[NON] Erreur lors du test: {e}")
             messagebox.showerror("Erreur", f"Erreur lors du test: {e}")
     
     def show_position_results(self):
@@ -1420,7 +1420,7 @@ Seuil effectif: {results['effective_threshold']:.4f} kg/m³
         try:
             # Création d'une nouvelle fenêtre
             results_window = tk.Toplevel(self.root)
-            results_window.title("📊 Résultats Détaillés du Test")
+            results_window.title(" Résultats Détaillés du Test")
             results_window.geometry("800x600")
             
             # Récupération des données du tableau
@@ -1486,7 +1486,7 @@ Seuil effectif: {results['effective_threshold']:.4f} kg/m³
             canvas.draw()
             canvas.get_tk_widget().pack(fill='both', expand=True)
             
-            self.log_test("✅ Résultats détaillés affichés")
+            self.log_test("[OK] Résultats détaillés affichés")
             
         except Exception as e:
             messagebox.showerror("Erreur", f"Erreur lors de l'affichage: {e}")
@@ -1496,7 +1496,7 @@ Seuil effectif: {results['effective_threshold']:.4f} kg/m³
         try:
             # Création d'une nouvelle fenêtre
             comparison_window = tk.Toplevel(self.root)
-            comparison_window.title("📈 Graphiques Comparatifs")
+            comparison_window.title(" Graphiques Comparatifs")
             comparison_window.geometry("1000x700")
             
             # Simulation de données comparatives
@@ -1570,7 +1570,7 @@ Seuil effectif: {results['effective_threshold']:.4f} kg/m³
             canvas.draw()
             canvas.get_tk_widget().pack(fill='both', expand=True)
             
-            self.log_test("✅ Graphiques comparatifs affichés")
+            self.log_test("[OK] Graphiques comparatifs affichés")
             
         except Exception as e:
             messagebox.showerror("Erreur", f"Erreur lors de l'affichage: {e}")

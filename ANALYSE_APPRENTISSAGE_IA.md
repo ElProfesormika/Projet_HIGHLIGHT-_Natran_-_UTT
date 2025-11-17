@@ -1,6 +1,6 @@
-# 📊 Analyse Détaillée de la Partie Apprentissage IA - HIGHLIGHT+
+# Analyse Détaillée de la Partie Apprentissage IA - HIGHLIGHT+
 
-## 🎯 Vue d'Ensemble
+## Vue d'Ensemble
 
 HIGHLIGHT+ utilise une **architecture Teacher-Student** combinant deux approches d'intelligence artificielle pour la détection optimale de fuites de méthane. Cette architecture hybride permet de combiner la rigueur théorique des Processus Gaussiens avec l'efficacité opérationnelle de l'apprentissage par renforcement profond.
 
@@ -8,7 +8,7 @@ HIGHLIGHT+ utilise une **architecture Teacher-Student** combinant deux approches
 
 ---
 
-## 🧠 Comment Fonctionne la Partie Apprentissage IA
+##  Comment Fonctionne la Partie Apprentissage IA
 
 ### 1. Architecture Teacher-Student
 
@@ -61,11 +61,11 @@ kernel = ConstantKernel(variance) * RBF(length_scale) + WhiteKernel(noise_level)
    - Si convergence : Utilise la fonction d'acquisition sur grille 50×50
 
 **Avantages :**
-- ✅ Exploration intelligente basée sur l'incertitude
-- ✅ Modèle probabiliste avec estimation de confiance
-- ✅ Convergence garantie vers la source
-- ✅ Pas besoin de données d'entraînement préalables
-- ✅ Adaptation en temps réel aux nouvelles observations
+- [OK] Exploration intelligente basée sur l'incertitude
+- [OK] Modèle probabiliste avec estimation de confiance
+- [OK] Convergence garantie vers la source
+- [OK] Pas besoin de données d'entraînement préalables
+- [OK] Adaptation en temps réel aux nouvelles observations
 
 **Code clé :** `highlight_plus/models/teacher_gp.py`
 
@@ -196,12 +196,12 @@ R(s,a) = α · ΔI(M_GP) - β · E(s,a) + R_detection + R_proximity
    - Poids : `β = 0.1`
 
 3. **Récompenses spécifiques** :
-   - ✅ **Détection de fuite** : +100 points (une seule fois par détection)
-   - ✅ **Proximité à la source** : +10 × (1/distance) (continu)
-   - ✅ **Réduction d'incertitude** : +5 × ΔI (continu)
-   - ❌ **Consommation d'énergie** : -0.1 × énergie (continu)
-   - ❌ **Hors limites** : -50 points (pénalité)
-   - ❌ **Pas de progression** : -1 point (pénalité légère)
+   - [OK] **Détection de fuite** : +100 points (une seule fois par détection)
+   - [OK] **Proximité à la source** : +10 × (1/distance) (continu)
+   - [OK] **Réduction d'incertitude** : +5 × ΔI (continu)
+   - [NON] **Consommation d'énergie** : -0.1 × énergie (continu)
+   - [NON] **Hors limites** : -50 points (pénalité)
+   - [NON] **Pas de progression** : -1 point (pénalité légère)
 
 **Normalisation des récompenses :**
 - Récompenses normalisées entre [-1, 1] pour stabilité
@@ -288,7 +288,7 @@ Si 1-2 détections :
 
 ---
 
-## 📈 Niveau de Bonne Détection - Résultats Détaillés
+##  Niveau de Bonne Détection - Résultats Détaillés
 
 ### Métriques de Performance Mesurées
 
@@ -417,10 +417,10 @@ Score_Global = 0.4 × Score_Détection + 0.4 × Score_Localisation + 0.2 × Scor
    ```
 
 **Scores typiques observés :**
-- ✅ **80-100** : Excellent - Mission très réussie (15% des cas)
-- ℹ️ **60-79** : Bon - Mission réussie avec améliorations possibles (45% des cas)
-- ⚠️ **40-59** : Acceptable - Mission partielle (30% des cas)
-- ❌ **0-39** : Insuffisant - Mission échouée (10% des cas)
+- [OK] **80-100** : Excellent - Mission très réussie (15% des cas)
+- [INFO] **60-79** : Bon - Mission réussie avec améliorations possibles (45% des cas)
+- [ATTENTION] **40-59** : Acceptable - Mission partielle (30% des cas)
+- [NON] **0-39** : Insuffisant - Mission échouée (10% des cas)
 
 **Scores moyens observés dans les tests :**
 - **Teacher** : 70-85/100 (moyenne : 77)
@@ -467,9 +467,9 @@ Le système inclut un **validateur de performance** (`performance_validator.py`)
 
 ---
 
-## 🔬 Fiabilité pour Présentation en Concours
+##  Fiabilité pour Présentation en Concours
 
-### ✅ Points Forts
+### [OK] Points Forts
 
 1. **Architecture Scientifiquement Solide**
    - **Processus Gaussiens** : Méthode établie en apprentissage actif (Srinivas et al., 2010)
@@ -505,14 +505,14 @@ Le système inclut un **validateur de performance** (`performance_validator.py`)
    - Export des résultats
    - Logs détaillés
 
-### ⚠️ Points d'Attention
+### [ATTENTION] Points d'Attention
 
 1. **Simulation vs Réalité**
-   - ⚠️ **Tous les tests sont en simulation**
-   - ⚠️ Pas de validation sur données réelles de terrain
-   - ⚠️ Modèle de panache simplifié (Gaussien 2D)
-   - ⚠️ Capteur TDLAS simulé (bruit modélisé)
-   - ⚠️ Conditions environnementales idéalisées
+   - [ATTENTION] **Tous les tests sont en simulation**
+   - [ATTENTION] Pas de validation sur données réelles de terrain
+   - [ATTENTION] Modèle de panache simplifié (Gaussien 2D)
+   - [ATTENTION] Capteur TDLAS simulé (bruit modélisé)
+   - [ATTENTION] Conditions environnementales idéalisées
 
 2. **Limitations du Modèle**
    - Modèle 2D simplifié (pas de variation verticale complexe)
@@ -532,62 +532,62 @@ Le système inclut un **validateur de performance** (`performance_validator.py`)
    - Pas de tests sur grandes surfaces
    - Complexité computationnelle peut limiter temps réel
 
-### 📊 Recommandations pour Présentation
+###  Recommandations pour Présentation
 
-#### ✅ **Ce que vous POUVEZ présenter :**
+#### [OK] **Ce que vous POUVEZ présenter :**
 
 1. **Architecture et Méthodologie**
-   - ✅ Approche Teacher-Student innovante
-   - ✅ Combinaison GP + RL (hybride)
-   - ✅ Optimisation multi-objectifs (détection + énergie)
-   - ✅ Système de validation robuste
-   - ✅ Détecteur multi-critères
+   - [OK] Approche Teacher-Student innovante
+   - [OK] Combinaison GP + RL (hybride)
+   - [OK] Optimisation multi-objectifs (détection + énergie)
+   - [OK] Système de validation robuste
+   - [OK] Détecteur multi-critères
 
 2. **Résultats en Simulation**
-   - ✅ Améliorations quantifiées vs baselines (+25-40%)
-   - ✅ Métriques de performance standardisées
-   - ✅ Comparaisons reproductibles
-   - ✅ Analyse de convergence
-   - ✅ Tests de robustesse
+   - [OK] Améliorations quantifiées vs baselines (+25-40%)
+   - [OK] Métriques de performance standardisées
+   - [OK] Comparaisons reproductibles
+   - [OK] Analyse de convergence
+   - [OK] Tests de robustesse
 
 3. **Preuve de Concept**
-   - ✅ Démonstration fonctionnelle complète
-   - ✅ Code open-source et documenté
-   - ✅ Architecture extensible
-   - ✅ Feuille de route réaliste
-   - ✅ Interface utilisateur professionnelle
+   - [OK] Démonstration fonctionnelle complète
+   - [OK] Code open-source et documenté
+   - [OK] Architecture extensible
+   - [OK] Feuille de route réaliste
+   - [OK] Interface utilisateur professionnelle
 
 4. **Innovation Technique**
-   - ✅ Distillation de connaissance Teacher→Student
-   - ✅ Fonction de récompense éco-informative
-   - ✅ Détection multi-critères avec confiance
-   - ✅ Estimation robuste de position
+   - [OK] Distillation de connaissance Teacher→Student
+   - [OK] Fonction de récompense éco-informative
+   - [OK] Détection multi-critères avec confiance
+   - [OK] Estimation robuste de position
 
-#### ⚠️ **Ce que vous DEVEZ clarifier :**
+#### [ATTENTION] **Ce que vous DEVEZ clarifier :**
 
 1. **Limites de la Simulation**
-   - ⚠️ Mentionner explicitement : "Résultats en simulation"
-   - ⚠️ Discuter des différences attendues en conditions réelles
-   - ⚠️ Présenter un plan de validation terrain
-   - ⚠️ Identifier les risques de transfert
+   - [ATTENTION] Mentionner explicitement : "Résultats en simulation"
+   - [ATTENTION] Discuter des différences attendues en conditions réelles
+   - [ATTENTION] Présenter un plan de validation terrain
+   - [ATTENTION] Identifier les risques de transfert
 
 2. **Hypothèses du Modèle**
-   - ⚠️ Modèle de panache Gaussien (simplification)
-   - ⚠️ Conditions météorologiques constantes
-   - ⚠️ Environnement 2D
-   - ⚠️ Capteur idéalisé
+   - [ATTENTION] Modèle de panache Gaussien (simplification)
+   - [ATTENTION] Conditions météorologiques constantes
+   - [ATTENTION] Environnement 2D
+   - [ATTENTION] Capteur idéalisé
 
 3. **Prochaines Étapes**
-   - ⚠️ Validation sur données réelles
-   - ⚠️ Tests de robustesse terrain
-   - ⚠️ Adaptation aux conditions variables
-   - ⚠️ Optimisation pour temps réel
+   - [ATTENTION] Validation sur données réelles
+   - [ATTENTION] Tests de robustesse terrain
+   - [ATTENTION] Adaptation aux conditions variables
+   - [ATTENTION] Optimisation pour temps réel
 
 ---
 
-## 🎯 Conclusion sur la Fiabilité
+##  Conclusion sur la Fiabilité
 
-### ✅ **OUI, vous pouvez présenter ces résultats pour le concours, MAIS :**
+### [OK] **OUI, vous pouvez présenter ces résultats pour le concours, MAIS :**
 
 1. **Présentez-les comme une PREUVE DE CONCEPT en simulation**
    - C'est approprié pour un concours d'innovation
@@ -614,21 +614,21 @@ Le système inclut un **validateur de performance** (`performance_validator.py`)
    - Base solide pour développement futur
    - Potentiel de transfert vers le réel
 
-### 📝 **Recommandation Finale**
+###  **Recommandation Finale**
 
 **Niveau de fiabilité : 7.5/10**
 
-- ✅ **Très fiable** pour une preuve de concept en simulation
-- ✅ **Architecture solide** et méthodologie rigoureuse
-- ✅ **Résultats mesurables** et reproductibles
-- ⚠️ **Limité** par l'absence de validation terrain
-- ✅ **Approprié** pour un concours d'innovation
+- [OK] **Très fiable** pour une preuve de concept en simulation
+- [OK] **Architecture solide** et méthodologie rigoureuse
+- [OK] **Résultats mesurables** et reproductibles
+- [ATTENTION] **Limité** par l'absence de validation terrain
+- [OK] **Approprié** pour un concours d'innovation
 
 **Présentez avec confiance, mais soyez transparent sur les limitations et les prochaines étapes !**
 
 ---
 
-## 📚 Références Techniques Détaillées
+##  Références Techniques Détaillées
 
 ### Fichiers Clés du Projet
 
@@ -677,7 +677,7 @@ Le système inclut un **validateur de performance** (`performance_validator.py`)
 
 ---
 
-## 🔄 Flux de Données et Architecture Système
+##  Flux de Données et Architecture Système
 
 ### Flux Complet d'Exécution
 
@@ -710,12 +710,15 @@ Le système inclut un **validateur de performance** (`performance_validator.py`)
    │  └─ learn() (si buffer > 1000)
    ├─ Détection
    │  └─ enhanced_detector.validate_detection()
+   │     └─ gp_validator.add_measurement() (accumulation mesures)
    └─ Validation
       └─ validator.add_detection()
    ↓
 5. Calcul Métriques Finales
    ├─ performance_validator.compute_metrics()
    ├─ enhanced_detector.estimate_leak_position()
+   │  ├─ gp_validator.get_leak_position() (priorité)
+   │  └─ _estimate_position_statistical() (fallback)
    └─ Génération rapport
    ↓
 6. Affichage Résultats
@@ -737,8 +740,9 @@ highlight_plus/
 ├── sensors/         # Capteurs
 │   └── tdlas_sensor.py  # Capteur TDLAS
 ├── analysis/        # Analyse et validation
-│   ├── enhanced_detector.py      # Détecteur
-│   ├── performance_validator.py  # Validateur
+│   ├── enhanced_detector.py      # Détecteur multi-critères
+│   ├── methane_leak_validator.py  # Validateur GP pour position
+│   ├── performance_validator.py  # Validateur de performance
 │   └── learning_analysis.py      # Analyse apprentissage
 ├── experiments/     # Expérimentations
 │   ├── run_comparison.py  # Comparaisons

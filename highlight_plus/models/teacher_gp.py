@@ -133,7 +133,12 @@ class GaussianProcessTeacher:
     
     def acquisition_function(self, x: np.ndarray, y: np.ndarray) -> np.ndarray:
         """
-        Calcule la fonction d'acquisition pour guider l'exploration
+        Calcule la fonction d'acquisition pour guider l'exploration (VERSION AMÉLIORÉE)
+        
+        Stratégie améliorée pour détection excellente :
+        - Combine exploration (haute incertitude) et exploitation (haute concentration)
+        - Privilégie les zones de haute incertitude pour maximiser le gain d'information
+        - S'adapte dynamiquement selon le nombre d'observations
         
         Args:
             x, y: Grille de points à évaluer
@@ -143,38 +148,163 @@ class GaussianProcessTeacher:
         """
         mean, std = self.predict(x, y)
         
+        # Normaliser mean et std pour combinaison équilibrée
+        mean_norm = (mean - mean.min()) / (mean.max() - mean.min() + 1e-6) if mean.max() > mean.min() else mean
+        std_norm = (std - std.min()) / (std.max() - std.min() + 1e-6) if std.max() > std.min() else std
+        
+        # AMÉLIORATION : Exploration active guidée par incertitude
+        # Plus on a d'observations, plus on privilégie l'exploitation
+        n_obs = len(self.observations)
+        exploration_weight = max(0.3, 1.0 - n_obs / 50.0)  # De 1.0 à 0.3 selon observations
+        exploitation_weight = 1.0 - exploration_weight
+        
         if self.config.acquisition_function == "UCB":
-            # Upper Confidence Bound
-            return mean + self.config.exploration_parameter * std
+            # Upper Confidence Bound amélioré : combine mean et std avec poids adaptatifs
+            # Plus d'exploration au début, plus d'exploitation après
+            acquisition = (exploitation_weight * mean_norm + 
+                          exploration_weight * self.config.exploration_parameter * std_norm)
+            return acquisition
         elif self.config.acquisition_function == "EI":
-            # Expected Improvement (simplifié)
-            return std * np.exp(-0.5 * (mean / std)**2)
+            # Expected Improvement : privilégie zones avec potentiel d'amélioration
+            # Combinaison de l'incertitude et de la concentration attendue
+            best_mean = mean.max()
+            improvement = np.maximum(0, mean - best_mean)
+            ei = std * improvement / (std + 1e-6)
+            return ei
         elif self.config.acquisition_function == "PI":
-            # Probability of Improvement
-            return std
+            # Probability of Improvement : privilégie l'incertitude
+            return std_norm
         else:
-            # Par défaut : maximiser l'incertitude
-            return std
+            # Par défaut : maximiser l'incertitude (exploration pure)
+            # Mais avec un peu d'exploitation si concentration élevée
+            return exploration_weight * std_norm + exploitation_weight * mean_norm
     
     def select_next_point(self, current_x: float, current_y: float, 
                          gradient_x: Optional[float] = None,
                          gradient_y: Optional[float] = None,
-                         target_position: Optional[Tuple[float, float]] = None) -> Tuple[float, float]:
+                         target_position: Optional[Tuple[float, float]] = None,
+                         estimated_source: Optional[Tuple[float, float]] = None) -> Tuple[float, float]:
         """
-        Sélectionne le prochain point à explorer
+        Sélectionne le prochain point à explorer avec phase de convergence fine
         
         Args:
             current_x, current_y: Position actuelle
             gradient_x, gradient_y: Gradient de concentration (optionnel, pour guider l'exploration)
             target_position: Position cible estimée (optionnel, pour exploration initiale)
+            estimated_source: Position estimée de la source (optionnel, pour convergence fine)
             
         Returns:
             Tuple (next_x, next_y) : Prochaine position
         """
+        # PHASE DE CONVERGENCE FINE AMÉLIORÉE : Si proche de la source estimée, stratégie intelligente
+        if estimated_source is not None:
+            dist_to_source = np.linalg.norm([
+                current_x - estimated_source[0], 
+                current_y - estimated_source[1]
+            ])
+            
+            # AMÉLIORATION : Détection de convergence multi-critères
+            # Si très proche (< 5m), recherche locale en spirale
+            if dist_to_source < 5.0:
+                # Recherche locale : mouvement circulaire autour de la source estimée
+                # Angle vers la source
+                angle_to_source = np.arctan2(
+                    estimated_source[1] - current_y,
+                    estimated_source[0] - current_x
+                )
+                
+                # Angle de recherche (rotation autour de la source)
+                n_obs = len(self.observations)
+                search_angle = angle_to_source + (n_obs * 0.5) % (2 * np.pi)
+                
+                # Direction tangentielle (perpendiculaire au rayon)
+                tangent_x = -np.sin(search_angle)
+                tangent_y = np.cos(search_angle)
+                
+                # Direction radiale (vers la source)
+                radial_x = np.cos(angle_to_source)
+                radial_y = np.sin(angle_to_source)
+                
+                # Combinaison : 60% tangentiel (exploration circulaire) + 40% radial (convergence)
+                combined_x = 0.6 * tangent_x + 0.4 * radial_x
+                combined_y = 0.6 * tangent_y + 0.4 * radial_y
+                combined_norm = np.sqrt(combined_x**2 + combined_y**2)
+                
+                if combined_norm > 1e-6:
+                    combined_x /= combined_norm
+                    combined_y /= combined_norm
+                
+                # Pas très petit pour recherche locale
+                step_size = max(0.2, dist_to_source * 0.1)  # Entre 0.2m et 0.5m
+                step_size = np.clip(step_size, 0.2, 0.5)
+                
+                next_x = current_x + step_size * combined_x
+                next_y = current_y + step_size * combined_y
+                
+                # S'assurer dans les limites
+                x_min, x_max, y_min, y_max = self.world_bounds
+                next_x = np.clip(next_x, x_min, x_max)
+                next_y = np.clip(next_y, y_min, y_max)
+                
+                return next_x, next_y
+            
+            # Si proche de la source (5-15m), utiliser stratégie de convergence fine guidée
+            elif dist_to_source < 15.0:
+                # Pas adaptatif : plus petit quand plus proche
+                adaptive_max_step = max(0.5, dist_to_source * 0.15)  # Max 2.25m à 15m, 0.5m à 5m
+                adaptive_min_step = max(0.2, dist_to_source * 0.04)  # Max 0.6m à 15m, 0.2m à 5m
+                
+                # Direction vers la source estimée
+                dir_to_source_x = estimated_source[0] - current_x
+                dir_to_source_y = estimated_source[1] - current_y
+                dir_norm = np.sqrt(dir_to_source_x**2 + dir_to_source_y**2)
+                
+                if dir_norm > 1e-6:
+                    dir_to_source_x /= dir_norm
+                    dir_to_source_y /= dir_norm
+                else:
+                    dir_to_source_x, dir_to_source_y = 0.0, 0.0
+                
+                # Utiliser le gradient si disponible pour convergence fine
+                if gradient_x is not None and gradient_y is not None:
+                    grad_mag = np.sqrt(gradient_x**2 + gradient_y**2)
+                    if grad_mag > 1e-7:
+                        grad_norm_x = gradient_x / grad_mag
+                        grad_norm_y = gradient_y / grad_mag
+                        
+                        # Combiner direction vers source estimée + gradient (70% source, 30% gradient)
+                        combined_dir_x = 0.7 * dir_to_source_x + 0.3 * grad_norm_x
+                        combined_dir_y = 0.7 * dir_to_source_y + 0.3 * grad_norm_y
+                        combined_norm = np.sqrt(combined_dir_x**2 + combined_dir_y**2)
+                        
+                        if combined_norm > 1e-6:
+                            combined_dir_x /= combined_norm
+                            combined_dir_y /= combined_norm
+                        else:
+                            combined_dir_x, combined_dir_y = dir_to_source_x, dir_to_source_y
+                    else:
+                        combined_dir_x, combined_dir_y = dir_to_source_x, dir_to_source_y
+                else:
+                    combined_dir_x, combined_dir_y = dir_to_source_x, dir_to_source_y
+                
+                # Pas proportionnel à la distance (plus petit quand plus proche)
+                step_size = adaptive_max_step * (dist_to_source / 15.0)
+                step_size = np.clip(step_size, adaptive_min_step, adaptive_max_step)
+                
+                next_x = current_x + step_size * combined_dir_x
+                next_y = current_y + step_size * combined_dir_y
+                
+                # S'assurer dans les limites
+                x_min, x_max, y_min, y_max = self.world_bounds
+                next_x = np.clip(next_x, x_min, x_max)
+                next_y = np.clip(next_y, y_min, y_max)
+                
+                return next_x, next_y
+        
         # Si on a un gradient significatif, l'utiliser pour guider l'exploration
         if gradient_x is not None and gradient_y is not None:
             gradient_magnitude = np.sqrt(gradient_x**2 + gradient_y**2)
-            if gradient_magnitude > 1e-6:
+            if gradient_magnitude > 1e-7:  # Seuil plus bas (1e-7 au lieu de 1e-6) pour meilleure utilisation
                 # Normaliser le gradient
                 grad_norm_x = gradient_x / gradient_magnitude
                 grad_norm_y = gradient_y / gradient_magnitude
@@ -220,14 +350,40 @@ class GaussianProcessTeacher:
                 return next_x, next_y
         
         # Sinon, utiliser la méthode classique avec acquisition function
-        # Grille de recherche
+        # Grille de recherche - RÉSOLUTION AMÉLIORÉE pour précision
         x_min, x_max, y_min, y_max = self.world_bounds
-        x_grid = np.linspace(x_min, x_max, 50)
-        y_grid = np.linspace(y_min, y_max, 50)
+        
+        # Résolution adaptative : plus fine si peu d'observations (meilleure exploration)
+        n_obs = len(self.observations)
+        if n_obs < 20:
+            grid_resolution = 150  # Très fine pour exploration initiale
+        elif n_obs < 50:
+            grid_resolution = 120  # Fine pour exploration active
+        else:
+            grid_resolution = 100  # Standard pour exploitation
+        
+        x_grid = np.linspace(x_min, x_max, grid_resolution)
+        y_grid = np.linspace(y_min, y_max, grid_resolution)
         X_grid, Y_grid = np.meshgrid(x_grid, y_grid)
         
-        # Calcul de la fonction d'acquisition
+        # Calcul de la fonction d'acquisition (exploration active)
         acquisition_values = self.acquisition_function(X_grid, Y_grid)
+        
+        # AMÉLIORATION : Privilégier les zones de haute incertitude
+        # Obtenir la carte d'incertitude
+        X_unc = np.c_[X_grid.ravel(), Y_grid.ravel()]
+        _, uncertainty = self.gp.predict(X_unc, return_std=True)
+        uncertainty = uncertainty.reshape(X_grid.shape)
+        
+        # Normaliser l'incertitude
+        if uncertainty.max() > uncertainty.min():
+            uncertainty_norm = (uncertainty - uncertainty.min()) / (uncertainty.max() - uncertainty.min())
+        else:
+            uncertainty_norm = uncertainty
+        
+        # Combiner acquisition et incertitude (privilégier zones inexplorées)
+        # Poids plus élevé sur l'incertitude pour exploration active
+        combined_acquisition = 0.6 * acquisition_values + 0.4 * uncertainty_norm
         
         # Contrainte de distance maximale
         distances = np.sqrt((X_grid - current_x)**2 + (Y_grid - current_y)**2)
@@ -248,8 +404,8 @@ class GaussianProcessTeacher:
             
             return next_x, next_y
         
-        # Sélectionner le point avec la plus grande valeur d'acquisition
-        valid_acquisition = acquisition_values.copy()
+        # Sélectionner le point avec la plus grande valeur d'acquisition combinée
+        valid_acquisition = combined_acquisition.copy()
         valid_acquisition[~valid_mask] = -np.inf
         
         max_idx = np.unravel_index(np.argmax(valid_acquisition), valid_acquisition.shape)

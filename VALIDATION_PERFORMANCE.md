@@ -64,7 +64,7 @@ Dans l'onglet **"Résultats & Métriques"**, une nouvelle section **"Validation 
    - Score Global
    - Temps de Détection (avec badge de statut)
    - Précision de Localisation
-   - Statut de Mission (✅ Réussie ou ⚠️ Partielle)
+   - Statut de Mission (Reussie ou Partielle)
 
 2. **Détails de Localisation** :
    - Position Réelle (x, y)
@@ -91,8 +91,8 @@ La visualisation de trajectoire a été améliorée pour afficher :
 ### Logs Détaillés
 
 Pendant la simulation, les logs affichent maintenant :
-- `✅ MISSION RÉUSSIE - Score global: XX.X/100` (si mission réussie)
-- `⚠️ MISSION PARTIELLE - Score: XX.X/100` (si mission partielle)
+- `MISSION REUSSIE - Score global: XX.X/100` (si mission réussie)
+- `MISSION PARTIELLE - Score: XX.X/100` (si mission partielle)
 - Détails de première détection
 - Erreur de localisation
 
@@ -188,21 +188,21 @@ validator = PerformanceValidator(
 
 ### Score Global
 
-- **80-100** : ✅ Excellent - Mission très réussie
-- **60-79** : ℹ️ Bon - Mission réussie avec améliorations possibles
-- **40-59** : ⚠️ Acceptable - Mission partielle
-- **0-39** : ❌ Insuffisant - Mission échouée
+- **80-100** : Excellent - Mission très réussie
+- **60-79** : Bon - Mission réussie avec améliorations possibles
+- **40-59** : Acceptable - Mission partielle
+- **0-39** : Insuffisant - Mission échouée
 
 ### Temps de Détection
 
-- **< 10 s** : ✅ Rapide
-- **10-30 s** : ℹ️ Acceptable
-- **> 30 s** : ⚠️ Lent**
+- **< 10 s** : Rapide
+- **10-30 s** : Acceptable
+- **> 30 s** : Lent
 
 ### Précision de Localisation
 
-- **Erreur ≤ Tolérance** : ✅ Précis
-- **Erreur > Tolérance** : ⚠️ Imprécis
+- **Erreur ≤ Tolérance** : Précis
+- **Erreur > Tolérance** : Imprécis
 
 ## Exemples d'Utilisation
 
@@ -211,7 +211,7 @@ validator = PerformanceValidator(
 ```python
 metrics = validator.compute_metrics()
 if metrics.mission_success:
-    print("✅ Mission réussie !")
+    print("Mission reussie !")
     print(f"Erreur de localisation : {metrics.localization_accuracy.error_distance:.2f}m")
 ```
 
@@ -237,7 +237,3 @@ validator.export_results(metrics, "results.json")
 - [ ] Comparaison entre différentes méthodes (Teacher vs Student vs Baseline)
 - [ ] Analyse de robustesse sur plusieurs runs
 - [ ] Métriques de confiance pour les détections
-
-
-
-

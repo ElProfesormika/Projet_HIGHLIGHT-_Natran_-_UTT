@@ -26,7 +26,7 @@ def print_banner():
     banner = """
     ╔══════════════════════════════════════════════════════════════════════════════╗
     ║                                                                              ║
-    ║                    🚁 HIGHLIGHT+ - DÉTECTION INTELLIGENTE                    ║
+    ║                    HIGHLIGHT+ - DETECTION INTELLIGENTE                    ║
     ║                                                                              ║
     ║              Optimisation des trajectoires de vol – Drones                   ║
     ║              pour la détection de micro-fuites de méthane                    ║
@@ -43,13 +43,13 @@ def print_banner():
 def demo_plume_model():
     """Démonstration du modèle de panache de méthane"""
     print("\n" + "="*60)
-    print("🌪️  DÉMONSTRATION DU MODÈLE DE PANACHE DE MÉTHANE")
+    print("DEMONSTRATION DU MODELE DE PANACHE DE METHANE")
     print("="*60)
     
     # Création du panache de test
     plume = create_test_plume()
     
-    print("✅ Modèle de panache créé avec succès")
+    print("Modele de panache cree avec succes")
     print(f"   - Position de la fuite: ({plume.config.leak_x:.1f}, {plume.config.leak_y:.1f}) m")
     print(f"   - Intensité de la fuite: {plume.config.leak_intensity:.2f} kg/s")
     print(f"   - Vitesse du vent: {plume.config.wind_speed:.1f} m/s")
@@ -57,13 +57,13 @@ def demo_plume_model():
     
     # Test de la concentration
     test_points = [(30, 30), (50, 50), (70, 70)]
-    print("\n📊 Test de concentration en différents points:")
+    print("\nTest de concentration en differents points:")
     for x, y in test_points:
         conc = plume.concentration(x, y)
         print(f"   - Point ({x}, {y}): {conc:.4f} kg/m³")
     
     # Visualisation
-    print("\n🎨 Génération de la visualisation...")
+    print("\nGeneration de la visualisation...")
     fig, ax = plt.subplots(figsize=(10, 8))
     plume.plot_plume(ax=ax)
     plt.title("Modèle de Panache de Méthane - HIGHLIGHT+")
@@ -81,14 +81,14 @@ def demo_sensor():
     # Création du capteur
     sensor = create_test_sensor()
     
-    print("✅ Capteur TDLAS créé avec succès")
+    print("Capteur TDLAS cree avec succes")
     print(f"   - Niveau de bruit: {sensor.config.noise_level:.3f}")
     print(f"   - Seuil de détection: {sensor.config.detection_threshold:.3f} kg/m³")
     print(f"   - Portée maximale: {sensor.config.range_max:.0f} m")
     print(f"   - Fréquence de mise à jour: {sensor.config.update_frequency:.0f} Hz")
     
     # Test de mesure
-    print("\n🔍 Test de mesure avec différentes concentrations:")
+    print("\nTest de mesure avec differentes concentrations:")
     concentrations = [0.0, 0.02, 0.05, 0.1, 0.2]
     distances = [5.0, 10.0, 15.0]
     
@@ -100,7 +100,7 @@ def demo_sensor():
                   f"Mesuré: {measured:.3f}, Détecté: {detected}, SNR: {snr:.2f}")
     
     # Visualisation de l'historique
-    print("\n📈 Visualisation de l'historique des mesures...")
+    print("\nVisualisation de l'historique des mesures...")
     fig, ax = plt.subplots(figsize=(12, 6))
     sensor.plot_measurement_history(ax=ax)
     plt.title("Historique des Mesures TDLAS - HIGHLIGHT+")
@@ -112,19 +112,19 @@ def demo_sensor():
 def demo_teacher():
     """Démonstration de l'Expert (Teacher)"""
     print("\n" + "="*60)
-    print("🧠 DÉMONSTRATION DE L'EXPERT (TEACHER)")
+    print("DEMONSTRATION DE L'EXPERT (TEACHER)")
     print("="*60)
     
     # Création du Teacher
     teacher = create_test_teacher()
     
-    print("✅ Expert (Teacher) créé avec succès")
+    print("Expert (Teacher) cree avec succes")
     print(f"   - Kernel: RBF avec échelle {teacher.config.kernel_length_scale:.1f}")
     print(f"   - Fonction d'acquisition: {teacher.config.acquisition_function}")
     print(f"   - Paramètre d'exploration: {teacher.config.exploration_parameter:.1f}")
     
     # Simulation d'observations
-    print("\n🎯 Simulation d'observations et d'apprentissage actif...")
+    print("\nSimulation d'observations et d'apprentissage actif...")
     np.random.seed(42)
     
     current_x, current_y = 10.0, 10.0
@@ -147,7 +147,7 @@ def demo_teacher():
         current_x, current_y = next_x, next_y
     
     # Visualisation des résultats
-    print("\n🎨 Visualisation des résultats de l'Expert...")
+    print("\nVisualisation des resultats de l'Expert...")
     fig, ax = plt.subplots(figsize=(12, 10))
     teacher.plot_results(ax=ax)
     plt.title("Expert (Teacher) - Prédiction et Trajectoire - HIGHLIGHT+")
@@ -155,7 +155,7 @@ def demo_teacher():
     
     # Métriques de performance
     metrics = teacher.get_performance_metrics()
-    print("\n📊 Métriques de performance de l'Expert:")
+    print("\nMetriques de performance de l'Expert:")
     for key, value in metrics.items():
         print(f"   - {key}: {value:.4f}")
     
@@ -165,26 +165,26 @@ def demo_teacher():
 def demo_student():
     """Démonstration de l'Apprenti (Student)"""
     print("\n" + "="*60)
-    print("🎓 DÉMONSTRATION DE L'APPRENTI (STUDENT)")
+    print("DEMONSTRATION DE L'APPRENTI (STUDENT)")
     print("="*60)
     
     # Création du Student
     student = create_test_student()
     
-    print("✅ Apprenti (Student) créé avec succès")
+    print("Apprenti (Student) cree avec succes")
     print(f"   - Architecture: {student.config.hidden_layers}")
     print(f"   - Taux d'apprentissage: {student.config.learning_rate:.2e}")
     print(f"   - Poids de distillation: {student.config.lambda_kl:.2f}")
     
     # Test de sélection d'action
-    print("\n🎮 Test de sélection d'action...")
+    print("\nTest de selection d'action...")
     state = np.random.randn(11)
     action = student.select_action(state)
     print(f"   - État d'entrée: {state[:5]}... (dimension: {len(state)})")
     print(f"   - Action sélectionnée: {action}")
     
     # Simulation d'apprentissage
-    print("\n🧠 Simulation d'apprentissage...")
+    print("\nSimulation d'apprentissage...")
     for i in range(50):
         # Simulation d'expériences
         state = np.random.randn(11)
@@ -201,7 +201,7 @@ def demo_student():
     print(f"   - Métriques d'apprentissage: {metrics}")
     
     # Visualisation des progrès
-    print("\n📈 Visualisation des progrès d'entraînement...")
+    print("\nVisualisation des progres d'entrainement...")
     fig, ax = plt.subplots(figsize=(12, 6))
     student.plot_training_progress(ax=ax)
     plt.title("Progrès d'Entraînement de l'Apprenti - HIGHLIGHT+")
@@ -209,7 +209,7 @@ def demo_student():
     
     # Métriques de performance
     perf_metrics = student.get_performance_metrics()
-    print("\n📊 Métriques de performance de l'Apprenti:")
+    print("\nMetriques de performance de l'Apprenti:")
     for key, value in perf_metrics.items():
         print(f"   - {key}: {value:.4f}")
     
@@ -225,20 +225,20 @@ def demo_environment():
     # Création de l'environnement
     env = create_test_environment()
     
-    print("✅ Environnement de simulation créé avec succès")
+    print("Environnement de simulation cree avec succes")
     print(f"   - Dimensions du monde: {env.world_width}x{env.world_height} m")
     print(f"   - Nombre maximum d'étapes: {env.config.max_steps}")
     print(f"   - Position initiale: ({env.config.initial_position[0]}, {env.config.initial_position[1]}) m")
     print(f"   - Altitude initiale: {env.config.initial_altitude} m")
     
     # Test de l'environnement
-    print("\n🚀 Test de l'environnement...")
+    print("\nTest de l'environnement...")
     obs, info = env.reset()
     print(f"   - Observation initiale: {obs[:5]}... (dimension: {len(obs)})")
     print(f"   - Info initiale: {info}")
     
     # Simulation de quelques étapes
-    print("\n🎮 Simulation de quelques étapes...")
+    print("\nSimulation de quelques etapes...")
     for i in range(5):
         action = env.action_space.sample()
         obs, reward, terminated, truncated, info = env.step(action)
@@ -250,7 +250,7 @@ def demo_environment():
             break
     
     # Rendu de l'environnement
-    print("\n🎨 Rendu de l'environnement...")
+    print("\nRendu de l'environnement...")
     env.render()
     
     env.close()
@@ -260,7 +260,7 @@ def demo_environment():
 def demo_comparison():
     """Démonstration de la comparaison complète"""
     print("\n" + "="*60)
-    print("⚖️  DÉMONSTRATION DE LA COMPARAISON COMPLÈTE")
+    print("DEMONSTRATION DE LA COMPARAISON COMPLETE")
     print("="*60)
     
     # Configuration des expériences
@@ -272,21 +272,21 @@ def demo_comparison():
         output_dir="demo_results"
     )
     
-    print("✅ Configuration des expériences créée")
+    print("Configuration des experiences creee")
     print(f"   - Nombre de runs: {config.n_runs}")
     print(f"   - Étapes maximum: {config.max_steps}")
     print(f"   - Dossier de sortie: {config.output_dir}")
     
     # Exécution des expériences
-    print("\n🏃 Exécution des expériences comparatives...")
+    print("\nExecution des experiences comparatives...")
     runner = ExperimentRunner(config)
     
     try:
         results = runner.run_comparison()
-        print("\n✅ Expériences terminées avec succès!")
+        print("\nExperiences terminees avec succes!")
         
         # Affichage des résultats clés
-        print("\n🏆 RÉSULTATS CLÉS:")
+        print("\nRESULTATS CLES:")
         for method, data in results.items():
             metrics = data['metrics']
             print(f"\n   {method.upper()}:")
@@ -297,7 +297,7 @@ def demo_comparison():
         return results
         
     except Exception as e:
-        print(f"❌ Erreur lors de l'exécution des expériences: {e}")
+        print(f"ERREUR lors de l'execution des experiences: {e}")
         return None
 
 
@@ -305,13 +305,13 @@ def main():
     """Fonction principale de démonstration"""
     print_banner()
     
-    print("🚀 Démarrage de la démonstration HIGHLIGHT+")
+    print("Demarrage de la demonstration HIGHLIGHT+")
     print("Cette démonstration présente les capacités du système de détection")
     print("intelligente de micro-fuites de méthane avec l'architecture Teacher-Student.")
     
     try:
         # Démonstrations individuelles
-        print("\n" + "🔬 DÉMONSTRATIONS INDIVIDUELLES")
+        print("\n" + "DEMONSTRATIONS INDIVIDUELLES")
         print("="*60)
         
         # 1. Modèle de panache
@@ -335,53 +335,54 @@ def main():
         time.sleep(1)
         
         # Démonstration de la comparaison complète
-        print("\n" + "🏆 DÉMONSTRATION DE LA COMPARAISON COMPLÈTE")
+        print("\n" + "DEMONSTRATION DE LA COMPARAISON COMPLETE")
         print("="*60)
         
         results = demo_comparison()
         
         # Conclusion
         print("\n" + "="*60)
-        print("🎉 DÉMONSTRATION TERMINÉE AVEC SUCCÈS!")
+        print("DEMONSTRATION TERMINEE AVEC SUCCES!")
         print("="*60)
         
-        print("\n📋 RÉSUMÉ DE LA DÉMONSTRATION:")
-        print("   ✅ Modèle de panache de méthane - Fonctionnel")
-        print("   ✅ Capteur TDLAS simulé - Fonctionnel")
-        print("   ✅ Expert (Teacher) avec GP - Fonctionnel")
-        print("   ✅ Apprenti (Student) avec RL - Fonctionnel")
-        print("   ✅ Environnement de simulation - Fonctionnel")
-        print("   ✅ Comparaison complète - Fonctionnelle")
+        print("\nRESUME DE LA DEMONSTRATION:")
+        print("   - Modele de panache de methane - Fonctionnel")
+        print("   - Capteur TDLAS simule - Fonctionnel")
+        print("   - Expert (Teacher) avec GP - Fonctionnel")
+        print("   - Apprenti (Student) avec RL - Fonctionnel")
+        print("   - Environnement de simulation - Fonctionnel")
+        print("   - Comparaison complete - Fonctionnelle")
         
-        print("\n🎯 OBJECTIFS ATTEINTS:")
-        print("   🧠 Architecture Teacher-Student implémentée")
-        print("   📊 Modèle mathématique réaliste du panache")
-        print("   🔍 Simulation précise du capteur TDLAS")
-        print("   ⚡ Optimisation énergétique démontrée")
-        print("   📈 Métriques de performance quantifiées")
+        print("\nOBJECTIFS ATTEINTS:")
+        print("   - Architecture Teacher-Student implementee")
+        print("   - Modele mathematique realiste du panache")
+        print("   - Simulation precise du capteur TDLAS")
+        print("   - Optimisation energetique demontree")
+        print("   - Metriques de performance quantifiees")
         
-        print("\n🚀 PROCHAINES ÉTAPES:")
+        print("\nPROCHAINES ETAPES:")
         print("   1. Intégration matérielle (Phase 1)")
         print("   2. Tests en conditions réelles")
         print("   3. Démonstration pilote industrielle")
         print("   4. Commercialisation en 'Inspection-as-a-Service'")
         
-        print("\n💡 INNOVATION DÉMONTRÉE:")
+        print("\nINNOVATION DEMONTREE:")
         print("   - Combinaison unique IA + physique")
         print("   - Apprentissage actif pour l'exploration")
         print("   - Distillation de connaissance Teacher-Student")
         print("   - Optimisation multi-objectifs (détection + énergie)")
         
-        print("\n🏆 HIGHLIGHT+ est prêt pour le concours Natran x UTT!")
+        print("\nHIGHLIGHT+ est pret pour le concours Natran x UTT!")
         
     except Exception as e:
-        print(f"\n❌ Erreur lors de la démonstration: {e}")
+        print(f"\nERREUR lors de la demonstration: {e}")
         print("Veuillez vérifier que toutes les dépendances sont installées.")
         print("Exécutez: pip install -r requirements.txt")
 
 
 if __name__ == "__main__":
     main()
+
 
 
 

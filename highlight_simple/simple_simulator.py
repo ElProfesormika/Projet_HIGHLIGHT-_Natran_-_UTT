@@ -406,25 +406,25 @@ if __name__ == "__main__":
         max_steps=200
     )
     
-    print("🚁 Test simulateur simplifié HIGHLIGHT+")
+    print(" Test simulateur simplifié HIGHLIGHT+")
     print("=" * 50)
     
     # Test agent naïve
-    print("\n📊 Test agent NAÏVE...")
+    print("\nTest agent NAIVE...")
     sim_naive = SimpleSimulator(config, agent_type="naive")
     results_naive = sim_naive.run()
-    print(f"  ✅ Détections: {results_naive['n_detections']}")
-    print(f"  ✅ Temps de détection: {results_naive['detection_time']:.1f}s")
-    print(f"  ✅ Énergie: {results_naive['energy_consumed']:.1f} unités")
+    print(f"  Détections: {results_naive['n_detections']}")
+    print(f"  Temps de détection: {results_naive['detection_time']:.1f}s")
+    print(f"  Énergie: {results_naive['energy_consumed']:.1f} unités")
     
     # Test agent HIGHLIGHT+
-    print("\n📊 Test agent HIGHLIGHT+...")
+    print("\nTest agent HIGHLIGHT+...")
     sim_highlight = SimpleSimulator(config, agent_type="highlight")
     results_highlight = sim_highlight.run()
-    print(f"  ✅ Détections: {results_highlight['n_detections']}")
-    print(f"  ✅ Temps de détection: {results_highlight['detection_time']:.1f}s")
-    print(f"  ✅ Énergie: {results_highlight['energy_consumed']:.1f} unités")
+    print(f"  Détections: {results_highlight['n_detections']}")
+    print(f"  Temps de détection: {results_highlight['detection_time']:.1f}s")
+    print(f"  Énergie: {results_highlight['energy_consumed']:.1f} unités")
     
     print("\n" + "=" * 50)
-    print("✅ Tests terminés !")
+    print("Tests termines !")
 

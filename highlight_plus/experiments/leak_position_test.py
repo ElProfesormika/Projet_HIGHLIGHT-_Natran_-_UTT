@@ -543,4 +543,4 @@ if __name__ == "__main__":
     print(f"Efficacité énergétique moyenne: {overall_stats.get('mean_energy_efficiency', 0):.3f} ± {overall_stats.get('std_energy_efficiency', 0):.3f}")
     print(f"Précision de localisation moyenne: {overall_stats.get('mean_localization_accuracy', 0):.3f} ± {overall_stats.get('std_localization_accuracy', 0):.3f}")
     
-    print("\n✅ Test terminé avec succès!")
+    print("\nTest termine avec succes!")
