@@ -51,6 +51,9 @@ D'après les tests expérimentaux et l'analyse détaillée :
 - **Précision moyenne** : 1.8-2.1 mètres d'erreur
 - **Intelligence adaptative** : Apprentissage en temps réel
 - **Validation automatique** : Comparaison position réelle vs détectée
+- **Validateur GP** : Estimation probabiliste de la position de fuite avec Processus Gaussiens
+- **Arrêt automatique** : Simulation s'arrête automatiquement quand confiance ≥ 85%
+- **Reconnaissance de zone** : Stratégie multi-phase pour convergence précise sans dépassement
 
 ## Architecture du Système
 
@@ -92,7 +95,9 @@ python launch_app.py
 - Configuration complète du système (panache, capteur, drone, IA)
 - Gestion des positions de fuites multiples
 - Simulation avec validation automatique
-- Visualisation en temps réel (générées dynamiquement)
+- **Visualisation en temps réel** : Carte de confiance GP et trajectoire du drone
+- **Détection automatique** : Arrêt automatique quand position estimée avec confiance ≥ 85%
+- **Position estimée visible** : Marqueur clair sur la carte de confiance GP
 - Export des résultats (JSON, rapports)
 - Métriques de performance conformes à l'analyse
 
@@ -155,6 +160,11 @@ Le système inclut un **validateur de performance** automatique qui :
 - **[LIVRABLES_CONCOURS.md](LIVRABLES_CONCOURS.md)** - Liste des livrables et guide d'utilisation
 - **[PARAMETRES_OPTIMISATION_DETECTION.md](PARAMETRES_OPTIMISATION_DETECTION.md)** - Guide d'optimisation des paramètres
 - **[AMELIORATION_PRECISION_LOCALISATION.md](AMELIORATION_PRECISION_LOCALISATION.md)** - Guide d'amélioration de la précision
+- **[AMELIORATIONS_DETECTION_EXCELLENTE.md](AMELIORATIONS_DETECTION_EXCELLENTE.md)** - Améliorations pour détection excellente
+- **[AMELIORATION_RECONNAISSANCE_ZONE.md](AMELIORATION_RECONNAISSANCE_ZONE.md)** - Amélioration de la reconnaissance de zone et convergence
+- **[GUIDE_OPTIMISATION_CONCOURS.md](GUIDE_OPTIMISATION_CONCOURS.md)** - Configuration optimale pour le concours
+- **[CORRESPONDANCE_ACADEMIQUE.md](CORRESPONDANCE_ACADEMIQUE.md)** - Correspondance entre théorie et implémentation
+- **[NOUVELLES_FONCTIONNALITES.md](NOUVELLES_FONCTIONNALITES.md)** - Récapitulatif des nouvelles fonctionnalités
 
 ## Équipe
 
@@ -167,6 +177,12 @@ Le système inclut un **validateur de performance** automatique qui :
 **Résultats en simulation** : Tous les résultats présentés sont obtenus en simulation avec validation automatique. Pour validation terrain, voir la feuille de route dans [PRESENTATION_CONCOURS.md](PRESENTATION_CONCOURS.md).
 
 **Fiabilité** : Le système inclut une validation automatique qui compare les positions détectées avec les positions réelles configurées, permettant de prouver la fiabilité du modèle.
+
+**Nouvelles fonctionnalités** :
+- **Validateur GP** : Utilise un Processus Gaussien pour estimer la position de fuite avec probabilité
+- **Arrêt automatique** : La simulation s'arrête automatiquement quand la position est estimée avec confiance ≥ 85%
+- **Visualisation améliorée** : Carte de confiance GP en temps réel avec position estimée clairement visible
+- **Mode Full Learning amélioré** : Intégration complète GP + Teacher + Student pour détection optimale
 
 ## Licence
 

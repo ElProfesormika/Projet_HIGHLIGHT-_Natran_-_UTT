@@ -62,8 +62,12 @@ L'interface permet de :
 1. **Configurer** les paramètres du système (panache, capteur, drone, IA)
 2. **Définir** les positions de fuites à détecter
 3. **Lancer** la simulation avec validation automatique
-4. **Visualiser** les résultats en temps réel (générés dynamiquement)
-5. **Valider** la fiabilité : comparaison position réelle vs position détectée
+4. **Visualiser** les résultats en temps réel :
+   - Carte de confiance GP avec position estimée clairement visible
+   - Trajectoire du drone en temps réel
+   - Métriques mises à jour dynamiquement
+5. **Arrêt automatique** : Simulation s'arrête quand position estimée avec confiance ≥ 85%
+6. **Valider** la fiabilité : comparaison position réelle vs position détectée
 
 ### Preuve de Fiabilité
 
@@ -87,10 +91,10 @@ Le système inclut une **validation automatique** qui :
 1. **Modèle de Panache** : Simulation physique du panache de méthane
 2. **Capteur TDLAS** : Simulateur de capteur laser avec bruit réaliste
 3. **Environnement Gymnasium** : Environnement de simulation pour RL
-4. **Teacher (GP)** : Processus Gaussiens pour apprentissage actif
+4. **Teacher (GP)** : Processus Gaussiens pour apprentissage actif avec convergence multi-phase
 5. **Student (RL)** : Réseau de neurones pour navigation optimale
-6. **Détecteur Amélioré** : Validation multi-critères des détections
-7. **Validateur GP** : Estimation de position de fuite par Processus Gaussien
+6. **Détecteur Amélioré** : Validation multi-critères des détections avec clustering et filtrage temporel
+7. **Validateur GP** : Estimation probabiliste de position de fuite par Processus Gaussien avec arrêt automatique
 8. **Validateur de Performance** : Comparaison automatique des résultats
 
 ### Flux de Données

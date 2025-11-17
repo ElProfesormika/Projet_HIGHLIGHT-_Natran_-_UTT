@@ -864,6 +864,14 @@ def show_learning_analysis_tab():
     """Onglet d'analyse d'apprentissage"""
     st.markdown('<div class="section-header">Analyse de l\'Apprentissage</div>', unsafe_allow_html=True)
     
+    # Note informative sur le validateur GP
+    st.info("""
+    **Note** : Cette section analyse l'apprentissage du Student (RL). 
+    Pour la détection de position de fuite, le système utilise également un **Validateur GP** 
+    qui estime la position avec une probabilité de confiance et peut arrêter automatiquement 
+    la simulation quand la confiance ≥ 85%.
+    """)
+    
     col1, col2 = st.columns([2, 1])
     
     with col1:
@@ -880,6 +888,12 @@ def show_learning_analysis_tab():
 def show_robustness_tests_tab():
     """Onglet de tests de robustesse"""
     st.markdown('<div class="section-header">Tests de Robustesse</div>', unsafe_allow_html=True)
+    
+    # Note informative sur le validateur GP
+    st.info("""
+    **Tests de Robustesse** : Les tests utilisent le **Validateur GP** pour estimer la position de fuite 
+    avec une probabilité de confiance. La précision affichée est basée sur l'estimation GP (Processus Gaussiens).
+    """)
     
     if not st.session_state.leak_positions:
         st.warning("Aucune position de fuite configurée. Configurez les positions dans l'onglet Configuration.")
@@ -917,9 +931,11 @@ def show_comparative_simple_tab():
             <strong>Trajectoire Naïve</strong> (zigzag systématique) vs <strong>HIGHLIGHT+</strong> (Architecture Teacher-Student + RL).
             <br><br>
             - Utilise le <strong>vrai modele HIGHLIGHT+</strong> (Teacher-Student + RL + Environnement Gymnasium)
+            - <strong>Validateur GP</strong> : Estimation probabiliste de la position de fuite avec Processus Gaussiens
             - Generation dynamique des visualisations selon vos parametres
             - Resultats visuels et quantifies en temps reel
             - Metriques comparatives claires prouvant l'efficacite
+            - Position estimee GP affichee avec confiance
         </div>
     </div>
     """, unsafe_allow_html=True)
@@ -1085,13 +1101,15 @@ def generate_comparative_results(leak_x, leak_y, start_x, start_y, max_steps, n_
                     world_bounds=(0, 100, 0, 100)
                 )
                 
-                # Détecteur amélioré (pour métriques avancées seulement)
+                # Détecteur amélioré avec validateur GP (pour métriques avancées)
                 true_leak_pos = (plume_config.leak_x, plume_config.leak_y)
                 enhanced_detector = EnhancedDetector(
                     true_leak_position=true_leak_pos,
                     detection_threshold=sensor_config.detection_threshold,
                     confidence_threshold=0.3,  # Plus permissif pour comparaison
-                    min_distance_for_detection=50.0
+                    min_distance_for_detection=50.0,
+                    use_gp_validator=True,  # Activer le validateur GP
+                    gp_threshold_prob=0.95
                 )
                 
                 # Simulation
@@ -1335,7 +1353,9 @@ def generate_comparative_results(leak_x, leak_y, start_x, start_y, max_steps, n_
                     'final_distance': final_distance,
                     'trajectory': np.array(trajectory_highlight),
                     'avg_confidence': detector_stats.get('avg_confidence', 0.0),
-                    'estimated_position': estimated_pos
+                    'estimated_position': estimated_pos.tolist() if estimated_pos is not None else None,
+                    'estimation_confidence': estimation_confidence if estimated_pos is not None else 0.0,
+                    'gp_validator_used': True  # Indicateur d'utilisation du validateur GP
                 })
                 
                 progress_bar.progress((run + 1) / n_runs)
@@ -1405,7 +1425,15 @@ def generate_comparative_results(leak_x, leak_y, start_x, start_y, max_steps, n_
             report_text = generate_performance_report(metrics, n_runs, save_path=None)
             st.session_state['simple_performance_report'] = report_text
             
-            # Sauvegarder les métriques
+            # Sauvegarder les métriques avec informations GP
+            # Ajouter les informations GP si disponibles
+            if results_highlight_list and len(results_highlight_list) > 0:
+                last_result = results_highlight_list[-1]
+                if 'estimated_position' in last_result and last_result['estimated_position'] is not None:
+                    metrics['highlight']['estimated_position'] = last_result['estimated_position']
+                    metrics['highlight']['estimation_confidence'] = last_result.get('estimation_confidence', 0.0)
+                    metrics['highlight']['gp_validator_used'] = last_result.get('gp_validator_used', False)
+            
             st.session_state['simple_comparative_metrics'] = metrics
             st.session_state['simple_comparative_config'] = {
                 'leak_x': leak_x, 'leak_y': leak_y,
@@ -1565,10 +1593,14 @@ def generate_trajectory_comparison(trajectory_naive, trajectory_highlight, true_
         ax.plot(traj_highlight[0, 0], traj_highlight[0, 1], 'gs', markersize=12, label='Départ')
         ax.plot(traj_highlight[-1, 0], traj_highlight[-1, 1], 'rs', markersize=12, label='Arrivée')
     ax.plot(true_leak_pos[0], true_leak_pos[1], 'rx', markersize=20, linewidth=3, label='Fuite réelle')
+    
+    # Ajouter la position estimée GP si disponible dans les métriques
+    # (sera ajoutée dans display_comparative_results si disponible)
+    
     ax.set_xlim(0, 100)
     ax.set_ylim(0, 100)
     ax.set_aspect('equal')
-    ax.set_title('HIGHLIGHT+ (Teacher-Student)', fontweight='bold', fontsize=12)
+    ax.set_title('HIGHLIGHT+ (Teacher-Student + GP)', fontweight='bold', fontsize=12)
     ax.set_xlabel('Position X (m)')
     ax.set_ylabel('Position Y (m)')
     ax.legend(loc='best')
@@ -1718,6 +1750,40 @@ def display_comparative_results():
                 delta=f"-{metrics['naive']['final_distance'] - dist:.1f} m vs Naïve",
                 delta_color="inverse"
             )
+        
+        # Affichage de la position estimée GP si disponible
+        if 'estimated_position' in metrics['highlight'] and metrics['highlight']['estimated_position'] is not None:
+            st.markdown("---")
+            st.markdown('<div class="subsection-header">Position Estimée (GP Validator)</div>', unsafe_allow_html=True)
+            
+            est_pos = metrics['highlight']['estimated_position']
+            est_conf = metrics['highlight'].get('estimation_confidence', 0.0)
+            gp_used = metrics['highlight'].get('gp_validator_used', False)
+            
+            if gp_used:
+                st.success(f"**Validateur GP actif** : Estimation probabiliste avec Processus Gaussiens")
+            
+            config = st.session_state.get('simple_comparative_config', {})
+            true_pos = [config.get('leak_x', 0), config.get('leak_y', 0)]
+            
+            if len(est_pos) >= 2 and len(true_pos) >= 2:
+                error = np.linalg.norm(np.array(est_pos[:2]) - np.array(true_pos[:2]))
+                
+                est_col1, est_col2, est_col3 = st.columns(3)
+                with est_col1:
+                    st.markdown(f"**Position Estimée (GP):** ({est_pos[0]:.2f}, {est_pos[1]:.2f}) m")
+                    st.markdown(f"**Confiance GP:** {est_conf:.1%}")
+                    if est_conf >= 0.85:
+                        st.markdown('<span class="status-badge status-success">Confiance Élevée</span>', unsafe_allow_html=True)
+                with est_col2:
+                    st.markdown(f"**Position Réelle:** ({true_pos[0]:.2f}, {true_pos[1]:.2f}) m")
+                    st.caption("(Uniquement pour validation/comparaison)")
+                with est_col3:
+                    st.markdown(f"**Erreur:** {error:.2f} m")
+                    if error <= 2.0:
+                        st.markdown('<span class="status-badge status-success">Excellente Précision</span>', unsafe_allow_html=True)
+                    elif error <= 5.0:
+                        st.markdown('<span class="status-badge status-info">Bonne Précision</span>', unsafe_allow_html=True)
     
     # Visualisations - Générées en temps réel à partir des données réelles
     st.markdown('<div class="subsection-header">Visualisations Comparatives (Generees en Temps Reel)</div>', unsafe_allow_html=True)
@@ -1746,6 +1812,12 @@ def display_comparative_results():
                 )
                 st.image(traj_buffer, use_container_width=True)
                 st.caption("Comparaison visuelle des trajectoires : Agent Naïve (gauche) vs HIGHLIGHT+ (droite) - Généré en temps réel")
+                
+                # Afficher la position estimée GP si disponible
+                if 'estimated_position' in metrics['highlight'] and metrics['highlight']['estimated_position'] is not None:
+                    est_pos = metrics['highlight']['estimated_position']
+                    est_conf = metrics['highlight'].get('estimation_confidence', 0.0)
+                    st.info(f"**Position estimée GP:** ({est_pos[0]:.2f}, {est_pos[1]:.2f}) m | Confiance: {est_conf:.1%}")
     else:
         st.info("Les visualisations seront generees automatiquement apres la simulation comparative.")
 
@@ -1963,10 +2035,10 @@ def display_performance_metrics(results):
                 else:
                     st.metric("Convergence", "Non atteinte")
         
-        # Estimation améliorée de position
+        # Estimation améliorée de position (GP Validator)
         if 'estimated_position' in results and results['estimated_position']:
             st.markdown("---")
-            st.markdown('<div class="subsection-header">Estimation Amelioree de la Position</div>', unsafe_allow_html=True)
+            st.markdown('<div class="subsection-header">Position Estimée (GP Validator)</div>', unsafe_allow_html=True)
             
             est_pos = np.array(results['estimated_position'])
             est_conf = results.get('estimation_confidence', 0)
@@ -1981,18 +2053,31 @@ def display_performance_metrics(results):
                 true_pos_2d = true_pos[0][:2]
                 error = np.linalg.norm(est_pos - true_pos_2d)
                 
+                # Afficher si arrêt automatique a eu lieu
+                auto_stop = results.get('auto_stopped', False)
+                if auto_stop:
+                    st.success(f"**ARRÊT AUTOMATIQUE:** Position estimée avec confiance élevée ({est_conf:.1%})")
+                
                 est_col1, est_col2, est_col3 = st.columns(3)
                 with est_col1:
-                    st.markdown(f"**Position Estimée:** ({est_pos[0]:.2f}, {est_pos[1]:.2f}) m")
-                    st.markdown(f"**Confiance:** {est_conf:.1%}")
+                    st.markdown(f"**Position Estimée (GP):** ({est_pos[0]:.2f}, {est_pos[1]:.2f}) m")
+                    st.markdown(f"**Confiance GP:** {est_conf:.1%}")
+                    if est_conf >= 0.85:
+                        st.markdown('<span class="status-badge status-success">Confiance Élevée</span>', unsafe_allow_html=True)
+                    elif est_conf >= 0.6:
+                        st.markdown('<span class="status-badge status-info">Confiance Modérée</span>', unsafe_allow_html=True)
                 with est_col2:
                     st.markdown(f"**Position Réelle:** ({true_pos_2d[0]:.2f}, {true_pos_2d[1]:.2f}) m")
+                    st.caption("(Uniquement pour validation/comparaison)")
                 with est_col3:
                     st.markdown(f"**Erreur:** {error:.2f} m")
-                    if error < 10:
+                    if error <= 2.0:
                         st.markdown('<span class="status-badge status-success">Excellente Précision</span>', unsafe_allow_html=True)
-                    elif error < 20:
+                        st.caption("Conforme: 1.8-2.1m (analyse)")
+                    elif error <= 5.0:
                         st.markdown('<span class="status-badge status-info">Bonne Précision</span>', unsafe_allow_html=True)
+                    elif error <= 10.0:
+                        st.markdown('<span class="status-badge status-warning">Précision Acceptable</span>', unsafe_allow_html=True)
         
         # Détails de localisation
         if metrics.localization_accuracy:
@@ -2001,9 +2086,15 @@ def display_performance_metrics(results):
             
             # Indicateur de méthode utilisée
             n_detections = metrics.n_detections
-            if n_detections >= 3:
-                # Compter les détections réellement utilisées (limitées à 20)
-                n_used = min(n_detections, 20)
+            # Vérifier si le validateur GP a été utilisé
+            gp_used = results.get('gp_validator_used', False)
+            if gp_used:
+                st.success(f"**Validateur GP actif** : Estimation probabiliste avec Processus Gaussiens ({n_detections} mesures accumulées)")
+                if results.get('auto_stopped', False):
+                    st.info("**Arrêt automatique** : Simulation arrêtée quand confiance GP ≥ 85%")
+            elif n_detections >= 3:
+                # Compter les détections réellement utilisées (limitées à 50)
+                n_used = min(n_detections, 50)
                 st.info(f"Estimation robuste activee : Utilisation de {n_used} meilleures detections (sur {n_detections} totales) avec clustering, filtrage temporel et mediane ponderee")
             else:
                 st.warning(f"Estimation basique : Seulement {n_detections} detection(s). Pour une meilleure precision, visez au moins 3 detections.")
@@ -2399,6 +2490,12 @@ def display_test_results():
     """Affiche les résultats des tests"""
     df_results = pd.DataFrame(st.session_state.test_results)
     
+    # Note sur le validateur GP
+    st.info("""
+    **Tests de Robustesse** : Les tests utilisent le **Validateur GP** pour estimer la position de fuite 
+    avec une probabilité de confiance. La précision affichée est basée sur l'estimation GP.
+    """)
+    
     st.dataframe(df_results, use_container_width=True)
     
     col1, col2 = st.columns(2)
@@ -2411,9 +2508,25 @@ def display_test_results():
     
     with col2:
         fig = px.bar(df_results, x='position', y='precision', 
-                    title='Précision de Détection par Position',
+                    title='Précision de Détection par Position (GP)',
                     color='precision', color_continuous_scale='RdYlGn')
         st.plotly_chart(fig, use_container_width=True)
+    
+    # Résumé des résultats
+    if len(df_results) > 0:
+        avg_precision = pd.to_numeric(df_results['precision'], errors='coerce').mean()
+        avg_detections = pd.to_numeric(df_results['detections'], errors='coerce').mean()
+        
+        st.markdown("---")
+        st.markdown("**Résumé des Tests**")
+        col_sum1, col_sum2, col_sum3 = st.columns(3)
+        with col_sum1:
+            st.metric("Précision Moyenne (GP)", f"{avg_precision:.1f}%")
+        with col_sum2:
+            st.metric("Détections Moyennes", f"{avg_detections:.1f}")
+        with col_sum3:
+            success_count = len(df_results[df_results['status'] == 'Reussi'])
+            st.metric("Positions Réussies", f"{success_count}/{len(df_results)}")
 
 def visualize_plume():
     """Visualise le panache"""
@@ -3394,6 +3507,14 @@ def run_simulation():
         detection_rate = detection_count / max(1, step) * 100
         energy_efficiency = detection_count / max(1, energy_consumed) * 1000
         
+        # Vérifier si arrêt automatique a eu lieu
+        auto_stopped = False
+        if estimated_pos is not None and estimation_confidence >= 0.85:
+            auto_stopped = True
+        
+        # Vérifier si validateur GP a été utilisé
+        gp_validator_used = enhanced_detector.use_gp_validator and enhanced_detector.gp_validator is not None
+        
         st.session_state.simulation_results = {
             'trajectory': trajectory,
             'detections': env.detections,
@@ -3410,6 +3531,8 @@ def run_simulation():
             'detector_stats': detector_stats,
             'estimated_position': estimated_pos.tolist() if estimated_pos is not None else None,
             'estimation_confidence': estimation_confidence,
+            'auto_stopped': auto_stopped,  # Indicateur d'arrêt automatique
+            'gp_validator_used': gp_validator_used,  # Indicateur d'utilisation du validateur GP
             'enhanced_detections': [{
                 'step': d.step,
                 'position': d.position.tolist(),
@@ -3561,6 +3684,16 @@ def run_position_tests(iterations, steps, mode):
                     time_step=env_config.time_step
                 )
                 
+                # Détecteur amélioré avec validateur GP
+                enhanced_detector = EnhancedDetector(
+                    true_leak_position=true_leak_pos,
+                    detection_threshold=sensor_config.detection_threshold,
+                    confidence_threshold=0.5,
+                    min_distance_for_detection=50.0,
+                    use_gp_validator=True,  # Activer le validateur GP
+                    gp_threshold_prob=0.95
+                )
+                
                 # Initialisation selon le mode avec paramètres de l'interface
                 teacher = None
                 if mode in ['all', 'teacher'] or ai_config['simulation_mode'] in ['teacher_student', 'full_learning']:
@@ -3645,6 +3778,19 @@ def run_position_tests(iterations, steps, mode):
                             step=step,
                             energy=info.get('total_energy', 0)
                         )
+                        
+                        # Ajout au validateur GP
+                        if 'concentration' in info:
+                            gradient = np.array([grad_x, grad_y, 0.0])
+                            timestamp = step * env_config.time_step
+                            enhanced_detector.validate_detection(
+                                position=env.drone_position,
+                                measured_concentration=info.get('measured_concentration', 0),
+                                real_concentration=info.get('concentration', 0),
+                                step=step,
+                                timestamp=timestamp,
+                                gradient=gradient
+                            )
                     
                     if terminated or truncated:
                         break
@@ -3653,12 +3799,21 @@ def run_position_tests(iterations, steps, mode):
                 validator.total_steps = step + 1
                 metrics = validator.compute_metrics()
                 
+                # Estimation GP de la position
+                estimated_pos, estimation_confidence = enhanced_detector.estimate_leak_position()
+                if estimated_pos is not None:
+                    # Utiliser la position estimée GP pour les métriques
+                    error_gp = np.linalg.norm(estimated_pos - np.array(true_leak_pos))
+                    if metrics.localization_accuracy:
+                        metrics.localization_accuracy.error_distance = error_gp
+                        metrics.localization_accuracy.detected_position = estimated_pos
+                
                 elapsed_time = time.time() - start_time
                 total_detections += metrics.n_detections
                 total_time += elapsed_time
                 total_energy += info.get('total_energy', 0)
                 
-                # Précision basée sur l'erreur de localisation
+                # Précision basée sur l'erreur de localisation (GP si disponible)
                 if metrics.localization_accuracy:
                     error_dist = metrics.localization_accuracy.error_distance
                     # Précision = 100% si erreur < tolérance, sinon décroît

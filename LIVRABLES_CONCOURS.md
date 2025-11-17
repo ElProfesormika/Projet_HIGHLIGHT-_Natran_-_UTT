@@ -21,7 +21,12 @@ python launch_app.py
 - Configuration complète du système (panache, capteur, drone, IA)
 - Gestion des positions de fuites multiples
 - Simulation avec validation automatique
-- Visualisation en temps réel (générées dynamiquement)
+- **Visualisation en temps réel** :
+  - Carte de confiance GP avec position estimée clairement visible (marqueur rouge avec cercle de confiance)
+  - Trajectoire du drone mise à jour en temps réel
+  - Métriques dynamiques (étape, détections, énergie, erreur localisation)
+- **Arrêt automatique** : Simulation s'arrête quand position estimée avec confiance ≥ 85%
+- **Position estimée visible** : Marqueur clair sur la carte avec annotation
 - Export des résultats (JSON, rapports)
 
 ### 3. Démonstrations
@@ -39,6 +44,9 @@ python demo.py
 - **[PRESENTATION_CONCOURS.md](PRESENTATION_CONCOURS.md)** - Présentation complète
 - **[PARAMETRES_OPTIMISATION_DETECTION.md](PARAMETRES_OPTIMISATION_DETECTION.md)** - Guide d'optimisation
 - **[AMELIORATION_PRECISION_LOCALISATION.md](AMELIORATION_PRECISION_LOCALISATION.md)** - Guide de précision
+- **[AMELIORATIONS_DETECTION_EXCELLENTE.md](AMELIORATIONS_DETECTION_EXCELLENTE.md)** - Améliorations pour détection excellente
+- **[AMELIORATION_RECONNAISSANCE_ZONE.md](AMELIORATION_RECONNAISSANCE_ZONE.md)** - Amélioration de la reconnaissance de zone
+- **[GUIDE_OPTIMISATION_CONCOURS.md](GUIDE_OPTIMISATION_CONCOURS.md)** - Configuration optimale pour le concours
 
 ## Utilisation Rapide
 
@@ -108,7 +116,9 @@ Natran_x_UTT/
 - Interface Streamlit : Configuration → Simulation → Validation
 - Métriques de validation automatique
 - Comparaison position réelle vs détectée
-- **Message** : "Système validé avec preuve de fiabilité"
+- **Validateur GP** : Estimation probabiliste avec arrêt automatique
+- **Visualisation temps réel** : Carte de confiance GP avec position estimée visible
+- **Message** : "Système validé avec preuve de fiabilité et détection automatique"
 
 ### Slide 5 : Démonstration
 - Démonstration live de l'interface Streamlit
