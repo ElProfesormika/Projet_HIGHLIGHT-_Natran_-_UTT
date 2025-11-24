@@ -182,6 +182,12 @@ class MethaneDetectionEnv(gym.Env):
             self.step_count * self.config.time_step
         )
         
+        # S'assurer que concentration est un scalaire
+        if isinstance(concentration, np.ndarray):
+            concentration = float(concentration.item() if concentration.size == 1 else concentration.flat[0])
+        else:
+            concentration = float(concentration)
+        
         # Mesure du capteur
         measured_conc, detected = self.sensor.measure_at_position(
             self.drone_position[0],
@@ -204,13 +210,24 @@ class MethaneDetectionEnv(gym.Env):
             self.step_count * self.config.time_step
         )
         
+        # S'assurer que grad_x et grad_y sont des scalaires
+        if isinstance(grad_x, np.ndarray):
+            grad_x = float(grad_x.item() if grad_x.size == 1 else grad_x.flat[0])
+        else:
+            grad_x = float(grad_x)
+            
+        if isinstance(grad_y, np.ndarray):
+            grad_y = float(grad_y.item() if grad_y.size == 1 else grad_y.flat[0])
+        else:
+            grad_y = float(grad_y)
+        
         # Enregistrement de la mesure
         self.measurement_history.append({
             'position': self.drone_position.copy(),
             'concentration': concentration,
             'measured_concentration': measured_conc,
             'detected': detected,
-            'gradient': (grad_x, grad_y),
+            'gradient': (grad_x, grad_y),  # Toujours un tuple de scalaires
             'snr': snr
         })
         
@@ -397,7 +414,13 @@ class MethaneDetectionEnv(gym.Env):
             last_measurement = self.measurement_history[-1]
             concentration = last_measurement['measured_concentration']
             detected = float(last_measurement['detected'])
-            grad_x, grad_y = last_measurement['gradient']
+            grad_tuple = last_measurement['gradient']
+            # S'assurer que grad_x et grad_y sont des scalaires
+            if isinstance(grad_tuple, (list, tuple, np.ndarray)):
+                grad_x = float(grad_tuple[0]) if len(grad_tuple) > 0 else 0.0
+                grad_y = float(grad_tuple[1]) if len(grad_tuple) > 1 else 0.0
+            else:
+                grad_x, grad_y = 0.0, 0.0
             snr = last_measurement.get('snr', 0.0)
         else:
             concentration = 0.0

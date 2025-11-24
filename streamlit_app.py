@@ -23,6 +23,112 @@ import os
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 from highlight_plus.simulation.plume_model import MethanePlume, PlumeConfig
+
+# Classe wrapper pour gérer plusieurs sources de fuite
+class MultiSourcePlume:
+    """Wrapper pour gérer plusieurs sources de fuite en combinant leurs concentrations"""
+    def __init__(self, leak_positions: list, base_config: dict):
+        """
+        Args:
+            leak_positions: Liste de tuples (x, y, intensity)
+            base_config: Configuration de base (vent, diffusion, etc.)
+        """
+        self.leak_positions = leak_positions
+        self.plumes = []
+        
+        # Créer un panache pour chaque source
+        for x, y, intensity in leak_positions:
+            config = PlumeConfig(
+                leak_x=x,
+                leak_y=y,
+                leak_intensity=intensity,
+                wind_speed=base_config.get('wind_speed', 2.0),
+                wind_direction=base_config.get('wind_direction', 45.0),
+                sigma_x=base_config.get('sigma_x', 5.0),
+                sigma_y=base_config.get('sigma_y', 3.0),
+                decay_rate=base_config.get('decay_rate', 0.01)
+            )
+            self.plumes.append(MethanePlume(config))
+        
+        # Config de référence (pour compatibilité)
+        self.config = self.plumes[0].config if self.plumes else PlumeConfig()
+    
+    def concentration(self, x, y, time: float = 0.0):
+        """Calcule la concentration totale (somme de toutes les sources)"""
+        # Déterminer si les entrées sont des scalaires ou des arrays
+        is_scalar = not isinstance(x, np.ndarray) and not isinstance(y, np.ndarray)
+        
+        # Initialiser avec le bon type
+        if is_scalar:
+            total_conc = 0.0
+        else:
+            x_arr = np.asarray(x)
+            y_arr = np.asarray(y)
+            total_conc = np.zeros_like(x_arr, dtype=np.float64)
+        
+        for plume in self.plumes:
+            conc = plume.concentration(x, y, time)
+            # S'assurer que conc est du bon type
+            if is_scalar:
+                # Si c'est un scalaire, extraire la valeur scalaire
+                if isinstance(conc, np.ndarray):
+                    total_conc += float(conc.item() if conc.size == 1 else conc.flat[0])
+                else:
+                    total_conc += float(conc)
+            else:
+                # Si c'est un array, s'assurer que c'est un array
+                conc_arr = np.asarray(conc)
+                total_conc += conc_arr
+        
+        return total_conc
+    
+    def gradient(self, x, y, time: float = 0.0):
+        """Calcule le gradient total (somme vectorielle des gradients)"""
+        # Déterminer si les entrées sont des scalaires ou des arrays
+        is_scalar = not isinstance(x, np.ndarray) and not isinstance(y, np.ndarray)
+        
+        # Initialiser avec le bon type
+        if is_scalar:
+            total_grad_x = 0.0
+            total_grad_y = 0.0
+        else:
+            x_arr = np.asarray(x)
+            total_grad_x = np.zeros_like(x_arr, dtype=np.float64)
+            total_grad_y = np.zeros_like(x_arr, dtype=np.float64)
+        
+        for plume in self.plumes:
+            grad_x, grad_y = plume.gradient(x, y, time)
+            
+            # S'assurer que les gradients sont du bon type
+            if is_scalar:
+                # Si c'est un scalaire, extraire la valeur scalaire
+                if isinstance(grad_x, np.ndarray):
+                    total_grad_x += float(grad_x.item() if grad_x.size == 1 else grad_x.flat[0])
+                else:
+                    total_grad_x += float(grad_x)
+                    
+                if isinstance(grad_y, np.ndarray):
+                    total_grad_y += float(grad_y.item() if grad_y.size == 1 else grad_y.flat[0])
+                else:
+                    total_grad_y += float(grad_y)
+            else:
+                # Si c'est un array, s'assurer que c'est un array
+                grad_x_arr = np.asarray(grad_x)
+                grad_y_arr = np.asarray(grad_y)
+                total_grad_x += grad_x_arr
+                total_grad_y += grad_y_arr
+        
+        return total_grad_x, total_grad_y
+    
+    def _compute_wind_vector(self):
+        """Pour compatibilité"""
+        return self.config.wind_speed * np.cos(np.radians(self.config.wind_direction)), \
+               self.config.wind_speed * np.sin(np.radians(self.config.wind_direction))
+    
+    @property
+    def _wind_vector(self):
+        """Pour compatibilité"""
+        return self._compute_wind_vector()
 from highlight_plus.sensors.tdlas_sensor import TDLASSensor, TDLASConfig
 from highlight_plus.models.teacher_gp import GaussianProcessTeacher, TeacherConfig
 from highlight_plus.models.student_rl import StudentRL, StudentConfig
@@ -402,6 +508,35 @@ def get_mode_display_name(mode_value: str) -> str:
     return mode_display_map.get(mode_value, mode_value.upper())
 if 'simulation_logs' not in st.session_state:
     st.session_state.simulation_logs = []
+if 'plume_config' not in st.session_state:
+    st.session_state.plume_config = {
+        'leak_x': 50.0,
+        'leak_y': 50.0,
+        'leak_intensity': 0.3,
+        'wind_speed': 2.0,
+        'wind_direction': 45.0,
+        'sigma_x': 5.0,
+        'sigma_y': 3.0
+    }
+if 'sensor_config' not in st.session_state:
+    st.session_state.sensor_config = {
+        'detection_threshold': 0.03,
+        'noise_level': 0.04,
+        'range_max': 100.0,
+        'range_min': 1.0
+    }
+if 'drone_config' not in st.session_state:
+    st.session_state.drone_config = {
+        'initial_x': 10.0,
+        'initial_y': 10.0,
+        'initial_altitude': 5.0,
+        'max_speed': 5.0
+    }
+if 'ai_config' not in st.session_state:
+    st.session_state.ai_config = {
+        'simulation_mode': 'full_learning',
+        'max_steps': 200
+    }
 
 def main():
     """Fonction principale de l'application"""
@@ -480,10 +615,22 @@ def show_simulation_tab():
         </div>
         """, unsafe_allow_html=True)
     with col2:
+        # Afficher toutes les positions de fuite configurées
+        active_leak_positions = [pos for pos in st.session_state.get('leak_positions', []) if pos.get('active', True)]
+        if active_leak_positions:
+            if len(active_leak_positions) == 1:
+                pos = active_leak_positions[0]
+                leak_display = f"({pos['x']:.0f}, {pos['y']:.0f})"
+            else:
+                leak_display = f"{len(active_leak_positions)} positions"
+        else:
+            # Fallback sur plume_config si aucune position configurée
+            leak_display = f"({st.session_state.plume_config.get('leak_x', 0):.0f}, {st.session_state.plume_config.get('leak_y', 0):.0f})"
+        
         st.markdown(f"""
         <div class="metric-container">
-            <div class="metric-label">Position de Fuite</div>
-            <div class="metric-value">({st.session_state.plume_config.get('leak_x', 0):.0f}, {st.session_state.plume_config.get('leak_y', 0):.0f})</div>
+            <div class="metric-label">Position(s) de Fuite</div>
+            <div class="metric-value">{leak_display}</div>
         </div>
         """, unsafe_allow_html=True)
     with col3:
@@ -570,13 +717,47 @@ def show_plume_config():
     """Configuration du panache"""
     st.markdown('<div class="subsection-header">Paramètres du Panache de Méthane</div>', unsafe_allow_html=True)
     
+    # Initialiser plume_config s'il n'existe pas
+    if 'plume_config' not in st.session_state:
+        st.session_state.plume_config = {
+            'leak_x': 50.0,
+            'leak_y': 50.0,
+            'leak_intensity': 0.3,
+            'wind_speed': 2.0,
+            'wind_direction': 45.0,
+            'sigma_x': 5.0,
+            'sigma_y': 3.0
+        }
+    
+    # Vérifier si des positions sont configurées dans l'onglet dédié
+    active_leak_positions = [pos for pos in st.session_state.get('leak_positions', []) if pos.get('active', True)]
+    has_custom_positions = len(active_leak_positions) > 0
+    
+    if has_custom_positions:
+        st.info(f"""
+        **Note** : {len(active_leak_positions)} position(s) de fuite configurée(s) dans l'onglet **"Positions de Fuites"**.
+        Les paramètres ci-dessous (Position de la Source) sont utilisés uniquement si aucune position n'est configurée dans l'onglet dédié.
+        Pour gérer les positions de fuite, utilisez l'onglet **"Positions de Fuites"**.
+        """)
+    
     col1, col2 = st.columns(2)
     
     with col1:
-        st.markdown("**Position de la Source**")
-        leak_x = st.number_input("Coordonnée X (m)", min_value=0.0, max_value=100.0, value=50.0, step=1.0, key="plume_x")
-        leak_y = st.number_input("Coordonnée Y (m)", min_value=0.0, max_value=100.0, value=50.0, step=1.0, key="plume_y")
-        leak_intensity = st.number_input("Intensité de la Fuite (kg/s)", min_value=0.01, max_value=1.0, value=0.3, step=0.01, key="plume_intensity")
+        st.markdown("**Position de la Source** (Utilisée si aucune position dans 'Positions de Fuites')")
+        # Désactiver si des positions sont configurées
+        disabled = has_custom_positions
+        leak_x = st.number_input("Coordonnée X (m)", min_value=0.0, max_value=100.0, 
+                                value=st.session_state.plume_config.get('leak_x', 50.0), 
+                                step=1.0, key="plume_x", disabled=disabled,
+                                help="Utilisé uniquement si aucune position n'est configurée dans 'Positions de Fuites'")
+        leak_y = st.number_input("Coordonnée Y (m)", min_value=0.0, max_value=100.0, 
+                                value=st.session_state.plume_config.get('leak_y', 50.0), 
+                                step=1.0, key="plume_y", disabled=disabled,
+                                help="Utilisé uniquement si aucune position n'est configurée dans 'Positions de Fuites'")
+        leak_intensity = st.number_input("Intensité de la Fuite (kg/s)", min_value=0.01, max_value=1.0, 
+                                        value=st.session_state.plume_config.get('leak_intensity', 0.3), 
+                                        step=0.01, key="plume_intensity",
+                                        help="Intensité par défaut pour les nouvelles positions")
     
     with col2:
         st.markdown("**Conditions Environnementales**")
@@ -2755,19 +2936,32 @@ def run_simulation():
     
     # Gestion des positions de fuites multiples
     all_leak_positions = []
+    use_multi_source = False
+    
     if st.session_state.leak_positions:
         active_positions = [pos for pos in st.session_state.leak_positions if pos.get('active', True)]
         if active_positions:
             # Stocker toutes les positions pour référence
-            all_leak_positions = [(pos['x'], pos['y'], pos.get('intensity', 0.3)) for pos in active_positions]
-            # Utiliser la première pour la simulation initiale (le système détectera les autres)
-            first_position = active_positions[0]
-            base_plume_config['leak_x'] = first_position['x']
-            base_plume_config['leak_y'] = first_position['y']
-            base_plume_config['leak_intensity'] = first_position.get('intensity', base_plume_config.get('leak_intensity', 0.3))
-            log_message(f"Mode multi-fuites: {len(active_positions)} position(s) configurée(s)")
-            log_message(f"Position initiale: ({first_position['x']:.1f}, {first_position['y']:.1f})")
-            log_message(f"Le système détectera toutes les fuites pendant la simulation")
+            all_leak_positions = [(pos['x'], pos['y'], pos.get('intensity', base_plume_config.get('leak_intensity', 0.3))) for pos in active_positions]
+            use_multi_source = len(active_positions) > 1
+            
+            if use_multi_source:
+                # Mode multi-fuites : utiliser la première position pour la config de base
+                # Le panache combiné sera créé dans l'environnement
+                first_position = active_positions[0]
+                base_plume_config['leak_x'] = first_position['x']
+                base_plume_config['leak_y'] = first_position['y']
+                base_plume_config['leak_intensity'] = first_position.get('intensity', base_plume_config.get('leak_intensity', 0.3))
+                log_message(f"Mode multi-fuites: {len(active_positions)} position(s) configurée(s)")
+                for i, pos in enumerate(active_positions):
+                    log_message(f"  Fuite {i+1}: ({pos['x']:.1f}, {pos['y']:.1f}) m, Intensité: {pos.get('intensity', 0.3):.2f} kg/s")
+            else:
+                # Une seule position : utiliser celle-ci
+                first_position = active_positions[0]
+                base_plume_config['leak_x'] = first_position['x']
+                base_plume_config['leak_y'] = first_position['y']
+                base_plume_config['leak_intensity'] = first_position.get('intensity', base_plume_config.get('leak_intensity', 0.3))
+                log_message(f"Position de fuite configurée: ({first_position['x']:.1f}, {first_position['y']:.1f})")
     
     plume_config = PlumeConfig(**base_plume_config)
     sensor_config = TDLASConfig(**st.session_state.sensor_config)
@@ -2785,8 +2979,11 @@ def run_simulation():
     mode_display = get_mode_display_name(ai_config['simulation_mode'])
     log_message("Démarrage de la simulation HIGHLIGHT+")
     log_message(f"Mode: {mode_display}")
-    log_message(f"Position de fuite a detecter: ({plume_config.leak_x:.1f}, {plume_config.leak_y:.1f})")
-    log_message(f"Objectif: Detectar et localiser cette position avec precision")
+    if use_multi_source:
+        log_message(f"Objectif: Detectar et localiser {len(all_leak_positions)} position(s) de fuite avec precision")
+    else:
+        log_message(f"Position de fuite a detecter: ({plume_config.leak_x:.1f}, {plume_config.leak_y:.1f})")
+        log_message(f"Objectif: Detectar et localiser cette position avec precision")
     log_message("Navigation amelioree activee : Utilisation du gradient pour tous les modes")
     log_message("Detection robuste activee : Estimation multi-detections avec filtrage")
     log_message("Validation automatique : Comparaison position detectee vs position reelle")
@@ -2800,11 +2997,34 @@ def run_simulation():
     
     # Simulation
     try:
-        env = MethaneDetectionEnv(env_config, plume_config, sensor_config)
+        # Créer l'environnement avec panache multi-source si nécessaire
+        if use_multi_source and len(all_leak_positions) > 1:
+            # Créer un panache multi-source
+            multi_plume = MultiSourcePlume(all_leak_positions, base_plume_config)
+            # Créer l'environnement avec le premier panache (sera remplacé)
+            env = MethaneDetectionEnv(env_config, plume_config, sensor_config)
+            # Remplacer le panache par le multi-source
+            env.plume = multi_plume
+        else:
+            env = MethaneDetectionEnv(env_config, plume_config, sensor_config)
+        
         obs, info = env.reset()
         
+        # S'assurer que obs est un tableau numpy de la bonne forme (16 éléments)
+        if not isinstance(obs, np.ndarray):
+            obs = np.array(obs, dtype=np.float32)
+        if len(obs.shape) > 1:
+            obs = obs.flatten()
+        # S'assurer que obs a la bonne dimension (16)
+        if len(obs) != 16:
+            obs = env._get_observation(teacher)
+        
         # Initialisation du validateur de performance
-        true_leak_pos = (plume_config.leak_x, plume_config.leak_y)
+        # Pour multi-fuites, utiliser la première position comme référence principale
+        if use_multi_source and all_leak_positions:
+            true_leak_pos = (all_leak_positions[0][0], all_leak_positions[0][1])
+        else:
+            true_leak_pos = (plume_config.leak_x, plume_config.leak_y)
         validator = PerformanceValidator(
             true_leak_position=true_leak_pos,
             tolerance_radius=10.0,  # 10 mètres de tolérance
@@ -2907,11 +3127,21 @@ def run_simulation():
             )
             
             # Sélection de l'action - STRATÉGIE OPTIMISÉE MULTI-PHASE (>90% détection)
-            distance_to_source = np.sqrt(
-                (plume_config.leak_x - current_pos[0])**2 + 
-                (plume_config.leak_y - current_pos[1])**2
-            )
-            target_position = np.array([plume_config.leak_x, plume_config.leak_y])
+            # Calculer la distance à la source la plus proche (ou toutes les sources en mode multi-fuites)
+            if use_multi_source and all_leak_positions:
+                # Trouver la source la plus proche
+                distances_to_sources = [np.sqrt((pos[0] - current_pos[0])**2 + (pos[1] - current_pos[1])**2) 
+                                      for pos in all_leak_positions]
+                min_dist_idx = np.argmin(distances_to_sources)
+                closest_source = all_leak_positions[min_dist_idx]
+                distance_to_source = distances_to_sources[min_dist_idx]
+                target_position = np.array([closest_source[0], closest_source[1]])
+            else:
+                distance_to_source = np.sqrt(
+                    (plume_config.leak_x - current_pos[0])**2 + 
+                    (plume_config.leak_y - current_pos[1])**2
+                )
+                target_position = np.array([plume_config.leak_x, plume_config.leak_y])
             vec_to_target = target_position - current_pos
             distance_to_target = np.linalg.norm(vec_to_target)
             
@@ -3147,7 +3377,30 @@ def run_simulation():
                             pass
                     
                     # Action du Student (avec guidance Teacher si disponible)
+                    # S'assurer que obs est un tableau numpy de la bonne forme
+                    if not isinstance(obs, np.ndarray):
+                        obs = np.array(obs, dtype=np.float32)
+                    if len(obs.shape) > 1:
+                        obs = obs.flatten()
+                    # S'assurer que obs a la bonne dimension (16)
+                    if len(obs) != 16:
+                        # Si obs n'a pas la bonne dimension, utiliser _get_observation
+                        obs = env._get_observation(teacher)
+                    
                     action_student = student.select_action(obs, training=True, teacher_guidance=teacher_guidance)
+                    
+                    # S'assurer que action_student est un tableau numpy de shape (3,)
+                    if not isinstance(action_student, np.ndarray):
+                        action_student = np.array(action_student, dtype=np.float32)
+                    if len(action_student.shape) > 1:
+                        action_student = action_student.flatten()
+                    # S'assurer que action_student a la bonne dimension (3)
+                    if len(action_student) != 3:
+                        # Si action_student n'a pas la bonne dimension, prendre les 3 premiers éléments ou compléter
+                        if len(action_student) > 3:
+                            action_student = action_student[:3]
+                        else:
+                            action_student = np.append(action_student, [0.0] * (3 - len(action_student)))
                     
                     # Amélioration multi-phase avec guidance GP + Teacher (stratégie adaptative)
                     if distance_to_target > 25.0:
@@ -3191,7 +3444,11 @@ def run_simulation():
                             teacher_dir_nav = nav_dir.copy() if nav_dir is not None else np.array([0.0, 0.0])
                         
                         # Mélange adaptatif : Teacher (selon confiance) + Student (selon confiance) + Direction (fixe)
-                        combined = teacher_weight * teacher_dir_nav + student_weight * action_student[:2] + 0.2 * nav_dir
+                        # S'assurer que tous les vecteurs sont de shape (2,)
+                        teacher_dir_nav_2d = teacher_dir_nav[:2] if len(teacher_dir_nav) >= 2 else np.array([0.0, 0.0])
+                        action_student_2d = action_student[:2] if len(action_student) >= 2 else np.array([0.0, 0.0])
+                        nav_dir_2d = nav_dir[:2] if len(nav_dir) >= 2 else np.array([0.0, 0.0])
+                        combined = teacher_weight * teacher_dir_nav_2d + student_weight * action_student_2d + 0.2 * nav_dir_2d
                         combined_norm = np.linalg.norm(combined)
                         if combined_norm > 1e-6:
                             combined = combined / combined_norm
@@ -3211,7 +3468,7 @@ def run_simulation():
                                     gradient_x=grad_x,
                                     gradient_y=grad_y,
                                     target_position=tuple(target_position) if distance_to_target > 20.0 else None,
-                                    estimated_source=tuple(estimated_source) if estimated_source is not None and len(estimated_source) == 2 else None
+                                    estimated_source=tuple(estimated_source) if estimated_source is not None and (isinstance(estimated_source, (list, tuple, np.ndarray)) and len(estimated_source) >= 2) else None
                                 )
                                 teacher_vec = np.array([next_x, next_y]) - current_pos[:2]  # Utiliser seulement x, y
                                 teacher_norm = np.linalg.norm(teacher_vec)
@@ -3239,7 +3496,12 @@ def run_simulation():
                             
                             # Mélange adaptatif : Teacher (selon confiance) + Student (selon confiance) + Gradient + Centre
                             # Poids adaptatifs : Teacher et Student varient, Gradient et Centre fixes
-                            combined = teacher_weight * teacher_dir + student_weight * action_student[:2] + 0.25 * grad_dir + 0.15 * center_dir
+                            # S'assurer que tous les vecteurs sont de shape (2,)
+                            teacher_dir_2d = teacher_dir[:2] if len(teacher_dir) >= 2 else np.array([0.0, 0.0])
+                            action_student_2d = action_student[:2] if len(action_student) >= 2 else np.array([0.0, 0.0])
+                            grad_dir_2d = grad_dir[:2] if len(grad_dir) >= 2 else np.array([0.0, 0.0])
+                            center_dir_2d = center_dir[:2] if len(center_dir) >= 2 else np.array([0.0, 0.0])
+                            combined = teacher_weight * teacher_dir_2d + student_weight * action_student_2d + 0.25 * grad_dir_2d + 0.15 * center_dir_2d
                             combined_norm = np.linalg.norm(combined)
                             if combined_norm > 1e-6:
                                 combined = combined / combined_norm
@@ -3255,7 +3517,11 @@ def run_simulation():
                             center_dir = vec_to_center / dist_to_center if dist_to_center > 1e-6 else np.array([0, 0])
                             
                             # Mélange adaptatif : Teacher (selon confiance) + Student (selon confiance) + Centre
-                            combined = teacher_weight * teacher_dir + student_weight * action_student[:2] + 0.2 * center_dir
+                            # S'assurer que tous les vecteurs sont de shape (2,)
+                            teacher_dir_2d = teacher_dir[:2] if len(teacher_dir) >= 2 else np.array([0.0, 0.0])
+                            action_student_2d = action_student[:2] if len(action_student) >= 2 else np.array([0.0, 0.0])
+                            center_dir_2d = center_dir[:2] if len(center_dir) >= 2 else np.array([0.0, 0.0])
+                            combined = teacher_weight * teacher_dir_2d + student_weight * action_student_2d + 0.2 * center_dir_2d
                             combined_norm = np.linalg.norm(combined)
                             if combined_norm > 1e-6:
                                 combined = combined / combined_norm
@@ -3285,7 +3551,7 @@ def run_simulation():
                                     gradient_x=grad_x,
                                     gradient_y=grad_y,
                                     target_position=None,  # Près: focus sur gradient
-                                    estimated_source=tuple(estimated_source) if estimated_source is not None and len(estimated_source) == 2 else None
+                                    estimated_source=tuple(estimated_source) if estimated_source is not None and (isinstance(estimated_source, (list, tuple, np.ndarray)) and len(estimated_source) >= 2) else None
                                 )
                                 teacher_vec = np.array([next_x, next_y]) - current_pos[:2]  # Utiliser seulement x, y
                                 teacher_norm = np.linalg.norm(teacher_vec)
@@ -3295,8 +3561,15 @@ def run_simulation():
                                 pass
                         
                         # Utiliser l'estimation GP si disponible, sinon la position réelle
-                        search_center = estimated_source if estimated_source is not None else target_position
-                        vec_to_center = np.array(search_center) - current_pos[:2]  # Utiliser seulement x, y
+                        if estimated_source is not None:
+                            # S'assurer que estimated_source est de shape (2,)
+                            if isinstance(estimated_source, (list, tuple, np.ndarray)):
+                                search_center = np.array(estimated_source)[:2]  # Prendre seulement x, y
+                            else:
+                                search_center = target_position
+                        else:
+                            search_center = target_position
+                        vec_to_center = search_center - current_pos[:2]  # Utiliser seulement x, y
                         dist_to_center = np.linalg.norm(vec_to_center)
                         
                         grad_norm = np.linalg.norm([grad_x, grad_y])
@@ -3308,7 +3581,13 @@ def run_simulation():
                             circular_dir = np.array([np.cos(search_angle), np.sin(search_angle)])
                             center_dir = vec_to_center / dist_to_center if dist_to_center > 1e-6 else np.array([0, 0])
                             # Mélange adaptatif : Teacher (selon confiance) + Student (selon confiance) + Gradient + Spirale + Centre
-                            combined = teacher_weight * teacher_dir + student_weight * action_student[:2] + 0.25 * grad_dir + 0.15 * circular_dir + 0.1 * center_dir
+                            # S'assurer que tous les vecteurs sont de shape (2,)
+                            teacher_dir_2d = teacher_dir[:2] if len(teacher_dir) >= 2 else np.array([0.0, 0.0])
+                            action_student_2d = action_student[:2] if len(action_student) >= 2 else np.array([0.0, 0.0])
+                            grad_dir_2d = grad_dir[:2] if len(grad_dir) >= 2 else np.array([0.0, 0.0])
+                            circular_dir_2d = circular_dir[:2] if len(circular_dir) >= 2 else np.array([0.0, 0.0])
+                            center_dir_2d = center_dir[:2] if len(center_dir) >= 2 else np.array([0.0, 0.0])
+                            combined = teacher_weight * teacher_dir_2d + student_weight * action_student_2d + 0.25 * grad_dir_2d + 0.15 * circular_dir_2d + 0.1 * center_dir_2d
                             combined_norm = np.linalg.norm(combined)
                             if combined_norm > 1e-6:
                                 combined = combined / combined_norm
@@ -3323,7 +3602,12 @@ def run_simulation():
                             tangent_dir = np.array([-np.sin(search_angle), np.cos(search_angle)])
                             center_dir = vec_to_center / dist_to_center if dist_to_center > 1e-6 else np.array([0, 0])
                             # Mélange adaptatif : Teacher (selon confiance) + Student (selon confiance) + Tangente + Centre
-                            combined = teacher_weight * teacher_dir + student_weight * action_student[:2] + 0.2 * tangent_dir + 0.15 * center_dir
+                            # S'assurer que tous les vecteurs sont de shape (2,)
+                            teacher_dir_2d = teacher_dir[:2] if len(teacher_dir) >= 2 else np.array([0.0, 0.0])
+                            action_student_2d = action_student[:2] if len(action_student) >= 2 else np.array([0.0, 0.0])
+                            tangent_dir_2d = tangent_dir[:2] if len(tangent_dir) >= 2 else np.array([0.0, 0.0])
+                            center_dir_2d = center_dir[:2] if len(center_dir) >= 2 else np.array([0.0, 0.0])
+                            combined = teacher_weight * teacher_dir_2d + student_weight * action_student_2d + 0.2 * tangent_dir_2d + 0.15 * center_dir_2d
                             combined_norm = np.linalg.norm(combined)
                             if combined_norm > 1e-6:
                                 combined = combined / combined_norm
@@ -3378,8 +3662,15 @@ def run_simulation():
                         # Fallback final : utiliser gradient avec stratégie multi-phase
                         if distance_to_target > 25.0:
                             # Utiliser estimation GP si disponible
-                            nav_target = estimated_source if estimated_source is not None else target_position
-                            vec_to_nav = np.array(nav_target) - current_pos[:2]  # Utiliser seulement x, y
+                            if estimated_source is not None:
+                                # S'assurer que estimated_source est de shape (2,)
+                                if isinstance(estimated_source, (list, tuple, np.ndarray)):
+                                    nav_target = np.array(estimated_source)[:2]  # Prendre seulement x, y
+                                else:
+                                    nav_target = target_position
+                            else:
+                                nav_target = target_position
+                            vec_to_nav = nav_target - current_pos[:2]  # Utiliser seulement x, y
                             dist_to_nav = np.linalg.norm(vec_to_nav)
                             if dist_to_nav > 1e-6:
                                 nav_dir = vec_to_nav / dist_to_nav
@@ -3403,6 +3694,15 @@ def run_simulation():
             
             # Exécution
             obs, reward, terminated, truncated, info = env.step(action, teacher=teacher)
+            
+            # S'assurer que obs est un tableau numpy de la bonne forme après chaque step
+            if not isinstance(obs, np.ndarray):
+                obs = np.array(obs, dtype=np.float32)
+            if len(obs.shape) > 1:
+                obs = obs.flatten()
+            # S'assurer que obs a la bonne dimension (16)
+            if len(obs) != 16:
+                obs = env._get_observation(teacher)
             
             # Mise à jour du Teacher
             if teacher is not None and 'concentration' in info:
@@ -3437,7 +3737,13 @@ def run_simulation():
                     if step % 30 == 0:  # Log plus fréquent
                         log_message(f"Apprentissage - Perte: {metrics.get('total_loss', 0):.4f}, ε: {metrics.get('epsilon', 0):.3f}, Confiance Student: {student_confidence:.2f}, Poids T/S: {teacher_weight:.2f}/{student_weight:.2f}")
                 
-                obs = next_obs
+                # Mettre à jour obs pour la prochaine itération
+                obs = next_obs.copy() if isinstance(next_obs, np.ndarray) else np.array(next_obs, dtype=np.float32)
+                # S'assurer que obs a la bonne forme
+                if len(obs.shape) > 1:
+                    obs = obs.flatten()
+                if len(obs) != 16:
+                    obs = env._get_observation(teacher)
                 student.step_count += 1
             
             # Métriques
