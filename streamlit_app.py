@@ -390,6 +390,16 @@ if 'learning_history' not in st.session_state:
     st.session_state.learning_history = []
 if 'leak_positions' not in st.session_state:
     st.session_state.leak_positions = []
+
+# Fonction helper pour obtenir le nom d'affichage d'un mode
+def get_mode_display_name(mode_value: str) -> str:
+    """Convertit une valeur de mode interne en nom d'affichage"""
+    mode_display_map = {
+        'simple': 'Mode Simple',
+        'teacher_student': 'Mode Teacher',
+        'full_learning': 'Mode Teacher-Student'
+    }
+    return mode_display_map.get(mode_value, mode_value.upper())
 if 'simulation_logs' not in st.session_state:
     st.session_state.simulation_logs = []
 
@@ -455,10 +465,18 @@ def show_simulation_tab():
     # Métriques de configuration rapide
     col1, col2, col3, col4 = st.columns(4)
     with col1:
+        # Mapping des modes pour l'affichage
+        mode_display_map = {
+            'simple': 'Mode Simple',
+            'teacher_student': 'Mode Teacher',
+            'full_learning': 'Mode Teacher-Student'
+        }
+        current_mode = st.session_state.ai_config.get('simulation_mode', 'N/A')
+        display_mode = mode_display_map.get(current_mode, current_mode.upper())
         st.markdown(f"""
         <div class="metric-container">
             <div class="metric-label">Mode de Simulation</div>
-            <div class="metric-value">{st.session_state.ai_config.get('simulation_mode', 'N/A').upper()}</div>
+            <div class="metric-value">{display_mode}</div>
         </div>
         """, unsafe_allow_html=True)
     with col2:
@@ -591,10 +609,10 @@ def show_sensor_config():
         sensor_config = st.session_state.get('sensor_config', {})
         detection_threshold = st.number_input("Seuil de Détection (kg/m³)", min_value=0.001, max_value=1.0, 
                                              value=sensor_config.get('detection_threshold', 0.03), step=0.001, key="det_thresh", 
-                                             help="Concentration minimale pour déclencher une détection (optimal concours: 0.03)")
+                                             help="Concentration minimale pour déclencher une détection")
         noise_level = st.number_input("Niveau de Bruit (σ)", min_value=0.01, max_value=1.0, 
                                      value=sensor_config.get('noise_level', 0.04), step=0.01, key="noise",
-                                     help="Écart-type du bruit du capteur (optimal concours: 0.04)")
+                                     help="Écart-type du bruit du capteur")
     
     with col2:
         st.markdown("**Portée et Performance**")
@@ -604,7 +622,7 @@ def show_sensor_config():
                                           value=sensor_config.get('update_frequency', 10.0), step=1.0, key="freq")
         atmospheric_noise = st.number_input("Bruit Atmosphérique", min_value=0.0, max_value=0.5, 
                                            value=sensor_config.get('atmospheric_noise', 0.02), step=0.01, key="atm_noise",
-                                           help="Bruit atmosphérique (optimal concours: 0.02)")
+                                           help="Bruit atmosphérique")
     
     st.session_state.sensor_config = {
         'noise_level': noise_level,
@@ -625,13 +643,13 @@ def show_drone_config():
         drone_config = st.session_state.get('drone_config', {})
         max_speed = st.number_input("Vitesse Maximale (m/s)", min_value=1.0, max_value=20.0, 
                                    value=drone_config.get('max_speed', 4.5), step=0.1, key="max_speed",
-                                   help="Optimal concours: 4.5 m/s pour efficacité énergétique")
+                                   help="Vitesse maximale du drone")
         max_altitude = st.number_input("Altitude Maximale (m)", min_value=5.0, max_value=100.0, 
                                        value=drone_config.get('max_altitude', 15.0), step=1.0, key="max_alt",
-                                       help="Optimal concours: 15.0 m pour efficacité")
+                                       help="Altitude maximale du drone")
         min_altitude = st.number_input("Altitude Minimale (m)", min_value=1.0, max_value=50.0, 
                                       value=drone_config.get('min_altitude', 3.0), step=0.5, key="min_alt",
-                                      help="Optimal concours: 3.0 m pour sécurité et efficacité")
+                                      help="Altitude minimale du drone")
     
     with col2:
         st.markdown("**Conditions Initiales**")
@@ -651,74 +669,25 @@ def show_drone_config():
         'initial_altitude': initial_altitude
     }
 
-def load_optimal_concours_config():
-    """Charge la configuration optimale pour le concours"""
-    # Configuration Teacher (GP) optimale
-    st.session_state.ai_config = {
-        # Teacher (GP) - Optimisé pour précision
-        'kernel_length_scale': 8.0,
-        'kernel_variance': 1.2,
-        'noise_level_gp': 5e-4,
-        'teacher_exploration': 2.5,
-        'max_step_size': 4.0,
-        'min_step_size': 0.5,
-        'max_iterations': 150,
-        'convergence_threshold': 5e-5,
-        'min_uncertainty': 0.005,
-        # Student (RL) - Optimisé pour efficacité
-        'student_learning_rate': 2.5e-4,
-        'student_lambda_kl': 0.15,
-        'batch_size': 128,
-        'buffer_size': 20000,
-        # Général
-        'max_steps': 200,
-        'simulation_mode': 'full_learning'
-    }
-    
-    # Configuration Capteur optimale
-    st.session_state.sensor_config = {
-        'noise_level': 0.04,
-        'detection_threshold': 0.03,
-        'range_max': 100.0,
-        'update_frequency': 10.0,
-        'atmospheric_noise': 0.02
-    }
-    
-    # Configuration Drone optimale
-    st.session_state.drone_config = {
-        'max_speed': 4.5,
-        'max_altitude': 15.0,
-        'min_altitude': 3.0,
-        'initial_x': 10.0,
-        'initial_y': 10.0,
-        'initial_altitude': 5.0
-    }
-
 def show_ai_config():
     """Configuration des modèles IA"""
     st.markdown('<div class="subsection-header">Architecture Teacher-Student</div>', unsafe_allow_html=True)
     
-    # Bouton pour charger la configuration optimale du concours
-    col_opt1, col_opt2 = st.columns([3, 1])
-    with col_opt1:
-        st.info("Configuration optimale disponible pour le concours. Cliquez sur le bouton pour charger les paramètres optimaux (Taux detection: 92-95%, Precision: <2m).")
-    with col_opt2:
-        if st.button("Charger Config Optimale Concours", type="primary", use_container_width=True, key="btn_load_optimal"):
-            load_optimal_concours_config()
-            st.success("Configuration optimale chargée !")
-            st.rerun()
-    
     # Mode de simulation
     ai_config = st.session_state.get('ai_config', {})
-    mode_options = ["simple", "teacher_student", "full_learning"]
+    # Options avec labels affichés différents des valeurs internes
+    mode_options_display = ["Mode Simple", "Mode Teacher", "Mode Teacher-Student"]
+    mode_options_values = ["simple", "teacher_student", "full_learning"]
     default_mode = ai_config.get('simulation_mode', 'full_learning')
-    default_index = mode_options.index(default_mode) if default_mode in mode_options else 2
-    simulation_mode = st.selectbox(
+    default_index = mode_options_values.index(default_mode) if default_mode in mode_options_values else 2
+    selected_display = st.selectbox(
         "Mode de Simulation",
-        mode_options,
+        mode_options_display,
         index=default_index,
-        help="simple: Actions aléatoires | teacher_student: Expert seul | full_learning: Expert + Apprenti (optimal concours)"
+        help="Mode Simple: Actions aléatoires | Mode Teacher: Expert seul | Mode Teacher-Student: Expert + Apprenti"
     )
+    # Récupérer la valeur interne correspondante
+    simulation_mode = mode_options_values[mode_options_display.index(selected_display)]
     
     # Onglets pour organiser les paramètres
     tab1, tab2, tab3 = st.tabs(["Teacher (GP)", "Student (RL)", "General"])
@@ -735,19 +704,19 @@ def show_ai_config():
                 "Longueur d'Échelle Kernel (m)", 
                 min_value=1.0, max_value=20.0, 
                 value=ai_config.get('kernel_length_scale', 8.0), step=0.5,
-                help="Contrôle la résolution spatiale. Plus petit = plus précis (optimal concours: 8.0)"
+                help="Contrôle la résolution spatiale. Plus petit = plus précis"
             )
             kernel_variance = st.number_input(
                 "Variance du Kernel", 
                 min_value=0.1, max_value=5.0, 
                 value=ai_config.get('kernel_variance', 1.2), step=0.1,
-                help="Variance du processus gaussien (optimal concours: 1.2)"
+                help="Variance du processus gaussien"
             )
             noise_level_gp = st.number_input(
                 "Niveau de Bruit GP", 
                 min_value=1e-5, max_value=1e-2, 
                 value=ai_config.get('noise_level_gp', 5e-4), step=1e-5, format="%.0e",
-                help="Niveau de bruit du modèle GP (optimal concours: 5e-4)"
+                help="Niveau de bruit du modèle GP"
             )
         
         with col2:
@@ -756,19 +725,19 @@ def show_ai_config():
                 "Paramètre d'Exploration (β)", 
                 min_value=0.1, max_value=10.0, 
                 value=ai_config.get('teacher_exploration', 2.5), step=0.1,
-                help="Équilibre exploration/exploitation (UCB). Optimal concours: 2.5"
+                help="Équilibre exploration/exploitation (UCB)"
             )
             max_step_size = st.number_input(
                 "Pas Maximum (m)", 
                 min_value=0.5, max_value=10.0, 
                 value=ai_config.get('max_step_size', 4.0), step=0.5,
-                help="Taille maximale des pas (optimal concours: 4.0)"
+                help="Taille maximale des pas"
             )
             min_step_size = st.number_input(
                 "Pas Minimum (m)", 
                 min_value=0.1, max_value=5.0, 
                 value=ai_config.get('min_step_size', 0.5), step=0.1,
-                help="Taille minimale des pas (optimal concours: 0.5)"
+                help="Taille minimale des pas"
             )
         
         st.markdown("**Convergence**")
@@ -778,21 +747,21 @@ def show_ai_config():
                 "Max Itérations", 
                 min_value=50, max_value=500, 
                 value=ai_config.get('max_iterations', 150), step=50,
-                help="Nombre maximum d'itérations (optimal concours: 150)"
+                help="Nombre maximum d'itérations"
             )
         with col4:
             convergence_threshold = st.number_input(
                 "Seuil de Convergence", 
                 min_value=1e-6, max_value=1e-3, 
                 value=ai_config.get('convergence_threshold', 5e-5), step=1e-5, format="%.0e",
-                help="Seuil pour arrêter la convergence (optimal concours: 5e-5)"
+                help="Seuil pour arrêter la convergence"
             )
         
         min_uncertainty = st.number_input(
             "Incertitude Minimale", 
             min_value=0.001, max_value=0.1, 
             value=ai_config.get('min_uncertainty', 0.005), step=0.001,
-            help="Incertitude minimale acceptée (optimal concours: 0.005)"
+            help="Incertitude minimale acceptée"
         )
     
     with tab2:
@@ -807,13 +776,13 @@ def show_ai_config():
                 min_value=1e-5, max_value=1e-1, 
                 value=ai_config.get('student_learning_rate', 2.5e-4), 
                 step=1e-4, format="%.0e", 
-                help="Vitesse de convergence (optimal concours: 2.5e-4)"
+                help="Vitesse de convergence"
             )
             student_lambda_kl = st.number_input(
                 "Poids de Distillation (λ)", 
                 min_value=0.01, max_value=1.0, 
                 value=ai_config.get('student_lambda_kl', 0.15), step=0.01,
-                help="Importance de l'imitation du Teacher (optimal concours: 0.15)"
+                help="Importance de l'imitation du Teacher"
             )
         
         with col2:
@@ -821,13 +790,13 @@ def show_ai_config():
                 "Taille du Batch", 
                 min_value=16, max_value=256, 
                 value=ai_config.get('batch_size', 128), step=16,
-                help="Taille des batches d'entraînement (optimal concours: 128)"
+                help="Taille des batches d'entraînement"
             )
             buffer_size = st.number_input(
                 "Taille du Buffer", 
                 min_value=1000, max_value=50000, 
                 value=ai_config.get('buffer_size', 20000), step=1000,
-                help="Taille du buffer d'expérience (optimal concours: 20000)"
+                help="Taille du buffer d'expérience"
             )
     
     with tab3:
@@ -837,7 +806,7 @@ def show_ai_config():
             "Nombre Maximum d'Étapes", 
             min_value=100, max_value=2000, 
             value=ai_config.get('max_steps', 200), step=50,
-            help="Nombre maximum d'étapes de simulation (optimal concours: 200)"
+            help="Nombre maximum d'étapes de simulation"
         )
     
     # Stockage de la configuration
@@ -863,23 +832,29 @@ def show_ai_config():
     }
     
     # Informations sur les modes
+    mode_display = get_mode_display_name(simulation_mode)
     if simulation_mode == "simple":
-        st.info("Mode simple : Actions aléatoires. Utilisé pour baseline de performance.")
+        st.info(f"**{mode_display}** : Actions aléatoires. Utilisé pour baseline de performance.")
     elif simulation_mode == "teacher_student":
-        st.info("Mode Teacher seul : Utilise uniquement l'Expert (GP) pour guider l'exploration.")
+        st.info(f"**{mode_display}** : Utilise uniquement l'Expert (GP) pour guider l'exploration. Performance immédiate et stable.")
     else:
-        st.info("Mode complet : Combine l'Expert (planification stratégique) et l'Apprenti (pilotage tactique) avec distillation de connaissance.")
+        st.info(f"**{mode_display}** : Combine l'Expert (planification stratégique) et l'Apprenti (pilotage tactique) avec stratégie adaptative. Le Student apprend progressivement du Teacher.")
 
 def show_learning_analysis_tab():
     """Onglet d'analyse d'apprentissage"""
     st.markdown('<div class="section-header">Analyse de l\'Apprentissage</div>', unsafe_allow_html=True)
     
-    # Note informative sur le validateur GP
+    # Note informative sur l'apprentissage
     st.info("""
-    **Note** : Cette section analyse l'apprentissage du Student (RL). 
-    Pour la détection de position de fuite, le système utilise également un **Validateur GP** 
-    qui estime la position avec une probabilité de confiance et peut arrêter automatiquement 
-    la simulation quand la confiance ≥ 85%.
+    **Note** : Cette section analyse l'apprentissage du Student (RL) dans le **Mode Teacher-Student**. 
+    Le système utilise une **stratégie adaptative** où :
+    - Au début : Teacher (80%) + Student (20%) - Le Student apprend du Teacher
+    - Progressivement : Les poids s'ajustent selon la confiance du Student
+    - À la fin : Teacher (30%) + Student (70%) - Le Student devient autonome
+    
+    Pour la détection de position de fuite, le système utilise un **Validateur GP** qui estime 
+    la position avec une probabilité de confiance. En mode multi-fuites, le système continue 
+    la recherche après chaque détection pour identifier toutes les fuites.
     """)
     
     col1, col2 = st.columns([2, 1])
@@ -899,10 +874,17 @@ def show_robustness_tests_tab():
     """Onglet de tests de robustesse"""
     st.markdown('<div class="section-header">Tests de Robustesse</div>', unsafe_allow_html=True)
     
-    # Note informative sur le validateur GP
+    # Note informative sur les tests de robustesse
     st.info("""
     **Tests de Robustesse** : Les tests utilisent le **Validateur GP** pour estimer la position de fuite 
     avec une probabilité de confiance. La précision affichée est basée sur l'estimation GP (Processus Gaussiens).
+    
+    Les tests peuvent être effectués avec différents modes :
+    - **Mode Simple** : Stratégie multi-phase basique
+    - **Mode Teacher** : Utilise uniquement l'Expert (GP)
+    - **Mode Teacher-Student** : Utilise l'Expert + l'Apprenti avec stratégie adaptative
+    
+    En mode multi-fuites, le système détecte toutes les fuites configurées sans s'arrêter après la première détection.
     """)
     
     if not st.session_state.leak_positions:
@@ -940,12 +922,14 @@ def show_comparative_simple_tab():
             Cette section compare deux stratégies de navigation pour la détection de fuites :
             <strong>Trajectoire Naïve</strong> (zigzag systématique) vs <strong>HIGHLIGHT+</strong> (Architecture Teacher-Student + RL).
             <br><br>
-            - Utilise le <strong>vrai modele HIGHLIGHT+</strong> (Teacher-Student + RL + Environnement Gymnasium)
+            - Utilise le <strong>vrai modele HIGHLIGHT+</strong> (Mode Teacher-Student avec stratégie adaptative)
             - <strong>Validateur GP</strong> : Estimation probabiliste de la position de fuite avec Processus Gaussiens
+            - <strong>Gestion multi-fuites</strong> : Le système continue la recherche après chaque détection
             - Generation dynamique des visualisations selon vos parametres
             - Resultats visuels et quantifies en temps reel
             - Metriques comparatives claires prouvant l'efficacite
             - Position estimee GP affichee avec confiance
+            - <strong>Stratégie adaptative</strong> : Teacher et Student s'ajustent dynamiquement selon la confiance
         </div>
     </div>
     """, unsafe_allow_html=True)
@@ -1082,7 +1066,7 @@ def generate_comparative_results(leak_x, leak_y, start_x, start_y, max_steps, n_
                     'trajectory': result_naive['trajectory']
                 })
                 
-                status_text.text(f"Run {run+1}/{n_runs} : Simulation HIGHLIGHT+ (Teacher-Student)...")
+                status_text.text(f"Run {run+1}/{n_runs} : Simulation HIGHLIGHT+ (Mode Teacher-Student)...")
                 
                 # Simulation HIGHLIGHT+ (vrai modèle)
                 env = MethaneDetectionEnv(env_config, plume_config, sensor_config)
@@ -1171,7 +1155,7 @@ def generate_comparative_results(leak_x, leak_y, start_x, start_y, max_steps, n_
                             
                     elif distance_to_target > 10.0:
                         # PHASE 2: APPROCHE GUIDÉE (zone intermédiaire)
-                        # Combinaison optimale: Direction directe + Gradient + Teacher
+                        # Combinaison: Direction directe + Gradient + Teacher
                         if len(teacher.observations) < 3:
                             # Peu d'observations: navigation directe avec gradient
                             grad_norm = np.sqrt(grad_x**2 + grad_y**2)
@@ -1610,7 +1594,7 @@ def generate_trajectory_comparison(trajectory_naive, trajectory_highlight, true_
     ax.set_xlim(0, 100)
     ax.set_ylim(0, 100)
     ax.set_aspect('equal')
-    ax.set_title('HIGHLIGHT+ (Teacher-Student + GP)', fontweight='bold', fontsize=12)
+    ax.set_title('HIGHLIGHT+ (Mode Teacher-Student + GP)', fontweight='bold', fontsize=12)
     ax.set_xlabel('Position X (m)')
     ax.set_ylabel('Position Y (m)')
     ax.legend(loc='best')
@@ -1633,7 +1617,7 @@ def generate_performance_report(metrics, n_runs, save_path='rapport_performance.
     
     report = f"""
 {'='*70}
-RAPPORT DE PERFORMANCE - HIGHLIGHT+ (Teacher-Student + RL)
+RAPPORT DE PERFORMANCE - HIGHLIGHT+ (Mode Teacher-Student + RL)
 {'='*70}
 
 Date: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
@@ -1663,7 +1647,7 @@ Nombre de runs: {n_runs}
     report += f"""
 CONCLUSION:
 -----------
-HIGHLIGHT+ (Architecture Teacher-Student + RL) démontre une amélioration 
+HIGHLIGHT+ (Mode Teacher-Student avec stratégie adaptative) démontre une amélioration 
 significative par rapport à une trajectoire naïve systématique :
 
 • Taux de détection amélioré de {g['detection_rate']:+.1f}%
@@ -1867,6 +1851,29 @@ def show_results_tab():
         return
     
     results = st.session_state.simulation_results
+    
+    # Afficher toutes les fuites détectées si disponibles (mode multi-fuites)
+    all_detected_leaks = st.session_state.get('detected_leaks', [])
+    if all_detected_leaks:
+        st.markdown("---")
+        st.markdown('<div class="subsection-header">📍 Fuites Détectées (Mode Multi-Fuites)</div>', unsafe_allow_html=True)
+        st.success(f"✅ **{len(all_detected_leaks)} point(s) de fuite détecté(s)**")
+        
+        # Créer un DataFrame pour affichage
+        leaks_df = pd.DataFrame([
+            {
+                'ID': i+1,
+                'Position X (m)': f"{leak['position'][0]:.2f}",
+                'Position Y (m)': f"{leak['position'][1]:.2f}",
+                'Confiance': f"{leak['confidence']:.1%}",
+                'Étape': leak['step'],
+                'Temps (s)': f"{leak['time']:.1f}"
+            }
+            for i, leak in enumerate(all_detected_leaks)
+        ])
+        st.dataframe(leaks_df, use_container_width=True, hide_index=True)
+        st.info("💡 **Note** : En mode multi-fuites, le système continue la recherche après chaque détection pour identifier toutes les fuites.")
+    
     display_performance_metrics(results)
     
     if 'trajectory' in results and results['trajectory']:
@@ -2063,10 +2070,15 @@ def display_performance_metrics(results):
                 true_pos_2d = true_pos[0][:2]
                 error = np.linalg.norm(est_pos - true_pos_2d)
                 
-                # Afficher si arrêt automatique a eu lieu
+                # Afficher si arrêt automatique a eu lieu (mode fuite unique uniquement)
                 auto_stop = results.get('auto_stopped', False)
                 if auto_stop:
-                    st.success(f"**ARRÊT AUTOMATIQUE:** Position estimée avec confiance élevée ({est_conf:.1%})")
+                    st.success(f"**ARRÊT AUTOMATIQUE:** Position estimée avec confiance élevée ({est_conf:.1%}) - Mode fuite unique")
+                else:
+                    # Vérifier si on est en mode multi-fuites
+                    all_detected = st.session_state.get('detected_leaks', [])
+                    if len(all_detected) > 1:
+                        st.info(f"**Mode multi-fuites** : {len(all_detected)} fuite(s) détectée(s) - La simulation continue pour toutes les fuites")
                 
                 est_col1, est_col2, est_col3 = st.columns(3)
                 with est_col1:
@@ -2101,7 +2113,12 @@ def display_performance_metrics(results):
             if gp_used:
                 st.success(f"**Validateur GP actif** : Estimation probabiliste avec Processus Gaussiens ({n_detections} mesures accumulées)")
                 if results.get('auto_stopped', False):
-                    st.info("**Arrêt automatique** : Simulation arrêtée quand confiance GP ≥ 85%")
+                    st.info("**Arrêt automatique** : Simulation arrêtée quand confiance GP ≥ 85% (mode fuite unique)")
+                else:
+                    # Vérifier si on est en mode multi-fuites
+                    all_detected = st.session_state.get('detected_leaks', [])
+                    if len(all_detected) > 1:
+                        st.info(f"**Mode multi-fuites** : {len(all_detected)} fuite(s) détectée(s) - La simulation continue pour toutes les fuites")
             elif n_detections >= 3:
                 # Compter les détections réellement utilisées (limitées à 50)
                 n_used = min(n_detections, 50)
@@ -2497,46 +2514,185 @@ def display_learning_metrics():
     st.plotly_chart(fig, use_container_width=True)
 
 def display_test_results():
-    """Affiche les résultats des tests"""
+    """Affiche les résultats des tests avec informations détaillées"""
+    if not st.session_state.test_results or len(st.session_state.test_results) == 0:
+        st.info("Aucun résultat de test disponible. Lancez d'abord les tests de robustesse.")
+        return
+    
     df_results = pd.DataFrame(st.session_state.test_results)
     
     # Note sur le validateur GP
     st.info("""
     **Tests de Robustesse** : Les tests utilisent le **Validateur GP** pour estimer la position de fuite 
-    avec une probabilité de confiance. La précision affichée est basée sur l'estimation GP.
+    avec une probabilité de confiance. La précision affichée est basée sur l'estimation GP (Processus Gaussiens).
+    Les tests peuvent être effectués avec différents modes (Mode Simple, Mode Teacher, Mode Teacher-Student).
     """)
     
-    st.dataframe(df_results, use_container_width=True)
+    # Résumé global en haut
+    st.markdown("---")
+    st.markdown("### 📊 Résumé Global des Tests")
+    
+    col_sum1, col_sum2, col_sum3, col_sum4, col_sum5 = st.columns(5)
+    
+    with col_sum1:
+        avg_precision = pd.to_numeric(df_results['precision'].str.replace('%', ''), errors='coerce').mean()
+        st.metric("Précision Moyenne", f"{avg_precision:.1f}%")
+    
+    with col_sum2:
+        avg_detections = pd.to_numeric(df_results['detections'], errors='coerce').mean()
+        st.metric("Détections Moyennes", f"{avg_detections:.1f}")
+    
+    with col_sum3:
+        success_count = len(df_results[df_results['status'] == 'Reussi'])
+        success_rate = (success_count / len(df_results)) * 100 if len(df_results) > 0 else 0
+        st.metric("Taux de Réussite", f"{success_rate:.1f}%", f"{success_count}/{len(df_results)}")
+    
+    with col_sum4:
+        # Calculer la confiance GP moyenne
+        gp_conf_values = pd.to_numeric(df_results['gp_confidence'].str.replace('%', ''), errors='coerce')
+        avg_gp_conf = gp_conf_values.mean() if not gp_conf_values.isna().all() else 0
+        st.metric("Confiance GP Moyenne", f"{avg_gp_conf:.1f}%")
+    
+    with col_sum5:
+        # Calculer l'erreur moyenne
+        error_values = pd.to_numeric(df_results['error_distance'].str.replace('m', '').str.replace('N/A', 'nan'), errors='coerce')
+        avg_error = error_values.mean() if not error_values.isna().all() else None
+        if avg_error is not None and not np.isnan(avg_error):
+            st.metric("Erreur Moyenne", f"{avg_error:.2f}m")
+        else:
+            st.metric("Erreur Moyenne", "N/A")
+    
+    # Tableau détaillé avec toutes les informations
+    st.markdown("---")
+    st.markdown("### 📋 Détails par Position")
+    
+    # Réorganiser les colonnes pour meilleure lisibilité
+    display_columns = ['position', 'mode', 'status', 'precision', 'error_distance', 'gp_confidence', 
+                      'detections', 'detection_rate', 'leaks_detected', 'time', 'energy', 'stability', 'success_rate']
+    
+    # Filtrer les colonnes qui existent
+    available_columns = [col for col in display_columns if col in df_results.columns]
+    df_display = df_results[available_columns].copy()
+    
+    # Renommer les colonnes pour meilleure lisibilité
+    column_rename = {
+        'position': 'Position',
+        'mode': 'Mode',
+        'status': 'Statut',
+        'precision': 'Précision (%)',
+        'error_distance': 'Erreur (m)',
+        'gp_confidence': 'Confiance GP',
+        'detections': 'Détections',
+        'detection_rate': 'Taux Détection (%)',
+        'leaks_detected': 'Fuites Détectées',
+        'time': 'Temps (s)',
+        'energy': 'Énergie (J)',
+        'stability': 'Stabilité (%)',
+        'success_rate': 'Taux Succès'
+    }
+    
+    df_display = df_display.rename(columns=column_rename)
+    
+    # Afficher le tableau avec style
+    st.dataframe(
+        df_display,
+        use_container_width=True,
+        hide_index=True
+    )
+    
+    # Graphiques de visualisation
+    st.markdown("---")
+    st.markdown("### 📈 Visualisations")
     
     col1, col2 = st.columns(2)
     
     with col1:
-        fig = px.bar(df_results, x='position', y='detections', 
-                    title='Nombre de Détections par Position',
-                    color='detections', color_continuous_scale='Blues')
+        # Graphique de précision par position
+        fig = px.bar(
+            df_results, 
+            x='position', 
+            y='precision',
+            color='status',
+            title='Précision de Détection par Position',
+            labels={'precision': 'Précision (%)', 'position': 'Position'},
+            color_discrete_map={'Reussi': '#28a745', 'Partiel': '#ffc107', 'Echec': '#dc3545'}
+        )
+        fig.update_layout(showlegend=True)
         st.plotly_chart(fig, use_container_width=True)
     
     with col2:
-        fig = px.bar(df_results, x='position', y='precision', 
-                    title='Précision de Détection par Position (GP)',
-                    color='precision', color_continuous_scale='RdYlGn')
+        # Graphique d'erreur par position
+        error_numeric = pd.to_numeric(df_results['error_distance'].str.replace('m', '').str.replace('N/A', 'nan'), errors='coerce')
+        df_error = df_results.copy()
+        df_error['error_numeric'] = error_numeric
+        
+        fig = px.bar(
+            df_error[df_error['error_numeric'].notna()],
+            x='position',
+            y='error_numeric',
+            color='status',
+            title='Erreur de Localisation par Position',
+            labels={'error_numeric': 'Erreur (m)', 'position': 'Position'},
+            color_discrete_map={'Reussi': '#28a745', 'Partiel': '#ffc107', 'Echec': '#dc3545'}
+        )
+        fig.update_layout(showlegend=True)
         st.plotly_chart(fig, use_container_width=True)
     
-    # Résumé des résultats
-    if len(df_results) > 0:
-        avg_precision = pd.to_numeric(df_results['precision'], errors='coerce').mean()
-        avg_detections = pd.to_numeric(df_results['detections'], errors='coerce').mean()
+    # Graphiques supplémentaires
+    col3, col4 = st.columns(2)
+    
+    with col3:
+        # Graphique de confiance GP
+        gp_conf_numeric = pd.to_numeric(df_results['gp_confidence'].str.replace('%', ''), errors='coerce')
+        df_gp = df_results.copy()
+        df_gp['gp_conf_numeric'] = gp_conf_numeric
         
-        st.markdown("---")
-        st.markdown("**Résumé des Tests**")
-        col_sum1, col_sum2, col_sum3 = st.columns(3)
-        with col_sum1:
-            st.metric("Précision Moyenne (GP)", f"{avg_precision:.1f}%")
-        with col_sum2:
-            st.metric("Détections Moyennes", f"{avg_detections:.1f}")
-        with col_sum3:
-            success_count = len(df_results[df_results['status'] == 'Reussi'])
-            st.metric("Positions Réussies", f"{success_count}/{len(df_results)}")
+        # Convertir detections en numérique pour le size
+        detections_numeric = pd.to_numeric(df_gp['detections'], errors='coerce')
+        df_gp['detections_numeric'] = detections_numeric
+        
+        fig = px.scatter(
+            df_gp[df_gp['gp_conf_numeric'].notna()],
+            x='position',
+            y='gp_conf_numeric',
+            size='detections_numeric',
+            color='precision',
+            title='Confiance GP vs Précision',
+            labels={'gp_conf_numeric': 'Confiance GP (%)', 'position': 'Position', 'precision': 'Précision (%)'},
+            color_continuous_scale='RdYlGn'
+        )
+        st.plotly_chart(fig, use_container_width=True)
+    
+    with col4:
+        # Graphique comparatif par mode
+        if 'mode' in df_results.columns:
+            mode_summary = df_results.groupby('mode').agg({
+                'precision': lambda x: pd.to_numeric(x.str.replace('%', ''), errors='coerce').mean(),
+                'detections': lambda x: pd.to_numeric(x, errors='coerce').mean()
+            }).reset_index()
+            
+            fig = px.bar(
+                mode_summary,
+                x='mode',
+                y='precision',
+                title='Performance par Mode',
+                labels={'precision': 'Précision Moyenne (%)', 'mode': 'Mode'},
+                color='precision',
+                color_continuous_scale='RdYlGn'
+            )
+            st.plotly_chart(fig, use_container_width=True)
+    
+    # Analyse détaillée par statut
+    st.markdown("---")
+    st.markdown("### 📊 Analyse par Statut")
+    
+    status_summary = df_results.groupby('status').agg({
+        'position': 'count',
+        'precision': lambda x: pd.to_numeric(x.str.replace('%', ''), errors='coerce').mean(),
+        'error_distance': lambda x: pd.to_numeric(x.str.replace('m', '').str.replace('N/A', 'nan'), errors='coerce').mean()
+    }).rename(columns={'position': 'Nombre', 'precision': 'Précision Moyenne (%)', 'error_distance': 'Erreur Moyenne (m)'})
+    
+    st.dataframe(status_summary, use_container_width=True)
 
 def visualize_plume():
     """Visualise le panache"""
@@ -2589,7 +2745,7 @@ def visualize_plume():
     st.plotly_chart(fig, use_container_width=True)
 
 def run_simulation():
-    """Lance la simulation avec architecture Teacher-Student complète"""
+    """Lance la simulation avec architecture Teacher-Student complète (Mode Teacher-Student avec stratégie adaptative)"""
     st.session_state.simulation_running = True
     st.session_state.simulation_logs = []
     st.session_state.simulation_progress = 0
@@ -2626,13 +2782,21 @@ def run_simulation():
     )
     
     # Logs
+    mode_display = get_mode_display_name(ai_config['simulation_mode'])
     log_message("Démarrage de la simulation HIGHLIGHT+")
-    log_message(f"Mode: {ai_config['simulation_mode']}")
+    log_message(f"Mode: {mode_display}")
     log_message(f"Position de fuite a detecter: ({plume_config.leak_x:.1f}, {plume_config.leak_y:.1f})")
     log_message(f"Objectif: Detectar et localiser cette position avec precision")
     log_message("Navigation amelioree activee : Utilisation du gradient pour tous les modes")
     log_message("Detection robuste activee : Estimation multi-detections avec filtrage")
     log_message("Validation automatique : Comparaison position detectee vs position reelle")
+    
+    # Message spécifique selon le mode
+    # Messages spécifiques selon le mode (déjà défini plus haut avec mode_display)
+    if ai_config['simulation_mode'] == "full_learning":
+        log_message(f"Stratégie adaptative activee ({mode_display}) : Teacher et Student s'ajustent dynamiquement selon la confiance")
+    elif ai_config['simulation_mode'] == "teacher_student":
+        log_message(f"{mode_display} : Utilisation de l'Expert (GP) pour guidance strategique")
     
     # Simulation
     try:
@@ -2684,7 +2848,7 @@ def run_simulation():
                 teacher_config,
                 world_bounds=(0, 100, 0, 100)
             )
-            log_message("Teacher (Expert) initialisé - Mode Performance Optimisé")
+            log_message(f"Teacher (Expert) initialisé - {mode_display}")
             
             if ai_config['simulation_mode'] == "full_learning":
                 student_config = StudentConfig(
@@ -2700,7 +2864,7 @@ def run_simulation():
                     config=student_config,
                     teacher=teacher
                 )
-                log_message("Student (Apprenti) initialisé avec distillation - Mode Performance Optimisé")
+                log_message(f"Student (Apprenti) initialisé avec distillation - {mode_display} (Stratégie adaptative)")
         
         # Variables de performance
         total_reward = 0
@@ -2752,7 +2916,7 @@ def run_simulation():
             distance_to_target = np.linalg.norm(vec_to_target)
             
             if ai_config['simulation_mode'] == "simple":
-                # MODE SIMPLE OPTIMISÉ : Stratégie multi-phase
+                # Mode Simple : Stratégie multi-phase optimisée
                 if distance_to_target > 25.0:
                     # PHASE 1: Navigation rapide directe
                     if distance_to_target > 1e-6:
@@ -2810,7 +2974,7 @@ def run_simulation():
                         else:
                             action = env.action_space.sample() * 0.4
             elif ai_config['simulation_mode'] == "teacher_student":
-                # MODE TEACHER-STUDENT OPTIMISÉ : Stratégie multi-phase avec Teacher
+                # Mode Teacher : Stratégie multi-phase avec Teacher (Expert GP)
                 if teacher is not None:
                     n_obs = len(teacher.observations)
                     
@@ -2923,7 +3087,7 @@ def run_simulation():
                 else:
                     action = env.action_space.sample()
             else:  # full_learning
-                # MODE FULL LEARNING OPTIMISÉ : Student + Teacher + Stratégie adaptative multi-phase avec GP
+                # Mode Teacher-Student : Student + Teacher + Stratégie adaptative multi-phase avec GP
                 # AMÉLIORATION : Stratégie adaptative qui favorise Teacher au début, puis augmente Student progressivement
                 estimated_source = None
                 if enhanced_detector.use_gp_validator and enhanced_detector.gp_validator is not None:
@@ -3846,6 +4010,9 @@ def run_position_tests(iterations, steps, mode):
     progress_bar = st.progress(0)
     status_text = st.empty()
     
+    # Liste pour stocker les métriques d'itération
+    all_iteration_metrics = []
+    
     total_positions = sum(1 for pos in st.session_state.leak_positions if pos['active'])
     total_tests = total_positions * iterations
     current_test = 0
@@ -3863,28 +4030,51 @@ def run_position_tests(iterations, steps, mode):
         'initial_y': 10.0,
         'initial_altitude': 5.0
     })
-    ai_config = st.session_state.get('ai_config', {
-        'simulation_mode': 'teacher_student' if mode != 'all' else 'teacher_student'
-    })
+    # Déterminer le mode de simulation selon le mode de test
+    if mode == 'all':
+        # Tester tous les modes
+        test_modes = ['simple', 'teacher_student', 'full_learning']
+    elif mode == 'teacher':
+        test_modes = ['teacher_student']
+    elif mode == 'student':
+        test_modes = ['full_learning']
+    else:  # comparison ou autre
+        test_modes = ['full_learning']  # Par défaut
     
-    for pos_idx, leak_pos in enumerate(st.session_state.leak_positions):
-        if not leak_pos['active']:
-            continue
+    # Récupérer la configuration de base
+    base_ai_config = st.session_state.get('ai_config', {})
+    
+    # Gérer les multiples fuites si configurées
+    active_positions = [pos for pos in st.session_state.leak_positions if pos.get('active', False)]
+    is_multi_leak = len(active_positions) > 1
+    
+    # Pour chaque mode à tester
+    for test_mode_value in test_modes:
+        # Mettre à jour la configuration avec le mode de test
+        ai_config = base_ai_config.copy()
+        ai_config['simulation_mode'] = test_mode_value
+        mode_display = get_mode_display_name(test_mode_value)
         
-        position_key = f"({leak_pos['x']:.1f}, {leak_pos['y']:.1f})"
-        log_message(f"Test position {position_key}...")
+        log_message(f"Tests avec {mode_display}...")
         
-        total_detections = 0
-        total_time = 0
-        total_energy = 0
-        total_precision = 0
-        successful_detections = 0
-        
-        for iteration in range(iterations):
-            current_test += 1
-            progress = current_test / total_tests
-            progress_bar.progress(progress)
-            status_text.text(f"Position {pos_idx+1}/{total_positions}, Itération {iteration+1}/{iterations}")
+        # Pour chaque position de fuite
+        for pos_idx, leak_pos in enumerate(active_positions):
+            position_key = f"({leak_pos['x']:.1f}, {leak_pos['y']:.1f})"
+            log_message(f"Test position {position_key} avec {mode_display}...")
+            
+            total_detections = 0
+            total_time = 0
+            total_energy = 0
+            total_precision = 0
+            successful_detections = 0
+            all_detected_leaks_per_position = []  # Pour stocker toutes les fuites détectées pour cette position
+            
+            for iteration in range(iterations):
+                current_test += 1
+                total_tests_calc = len(test_modes) * len(active_positions) * iterations
+                progress = current_test / total_tests_calc if total_tests_calc > 0 else 0
+                progress_bar.progress(progress)
+                status_text.text(f"{mode_display} - Position {pos_idx+1}/{len(active_positions)}, Itération {iteration+1}/{iterations}")
             
             try:
                 # Configuration du panache avec cette position
@@ -3929,7 +4119,9 @@ def run_position_tests(iterations, steps, mode):
                 
                 # Initialisation selon le mode avec paramètres de l'interface
                 teacher = None
-                if mode in ['all', 'teacher'] or ai_config['simulation_mode'] in ['teacher_student', 'full_learning']:
+                student = None
+                
+                if ai_config['simulation_mode'] in ['teacher_student', 'full_learning']:
                     teacher_config = TeacherConfig(
                         # Kernel GP
                         kernel_length_scale=ai_config.get('kernel_length_scale', 5.0),
@@ -3948,6 +4140,22 @@ def run_position_tests(iterations, steps, mode):
                     )
                     teacher = GaussianProcessTeacher(teacher_config, world_bounds=(0, 100, 0, 100))
                 
+                # Initialiser le Student pour le mode full_learning
+                if ai_config['simulation_mode'] == 'full_learning':
+                    student_config = StudentConfig(
+                        learning_rate=ai_config.get('student_learning_rate', 2.5e-4),
+                        lambda_kl=ai_config.get('student_lambda_kl', 0.15),
+                        batch_size=ai_config.get('batch_size', 128),
+                        buffer_size=ai_config.get('buffer_size', 20000),
+                        learning_starts=200
+                    )
+                    student = StudentRL(
+                        state_dim=16,
+                        action_dim=3,
+                        config=student_config,
+                        teacher=teacher
+                    )
+                
                 # Simulation rapide
                 start_time = time.time()
                 detection_count = 0
@@ -3962,7 +4170,27 @@ def run_position_tests(iterations, steps, mode):
                     )
                     
                     # Action selon le mode
-                    if teacher is not None:
+                    if ai_config['simulation_mode'] == 'full_learning' and student is not None:
+                        # Mode Teacher-Student : utiliser Student avec guidance Teacher
+                        obs_state = obs  # Utiliser l'observation actuelle
+                        
+                        # Guidance Teacher
+                        teacher_guidance = None
+                        if teacher is not None:
+                            next_x, next_y = teacher.select_next_point(
+                                current_pos[0], current_pos[1],
+                                gradient_x=grad_x, gradient_y=grad_y
+                            )
+                            teacher_dir = np.array([next_x, next_y]) - current_pos
+                            teacher_dir_norm = np.linalg.norm(teacher_dir)
+                            if teacher_dir_norm > 0.1:
+                                teacher_guidance = teacher_dir[:2] / teacher_dir_norm
+                        
+                        # Action Student
+                        action = student.select_action(obs_state, training=True, teacher_guidance=teacher_guidance)
+                        
+                    elif teacher is not None:
+                        # Mode Teacher : utiliser uniquement Teacher
                         next_x, next_y = teacher.select_next_point(
                             current_pos[0], current_pos[1],
                             gradient_x=grad_x, gradient_y=grad_y
@@ -3994,6 +4222,18 @@ def run_position_tests(iterations, steps, mode):
                     # Step
                     obs, reward, terminated, truncated, info = env.step(action, teacher=teacher)
                     
+                    # Mise à jour Student (pour full_learning)
+                    if ai_config['simulation_mode'] == 'full_learning' and student is not None:
+                        next_obs = obs
+                        student.store_experience(obs_state, action, reward, next_obs, terminated or truncated)
+                        
+                        # Apprentissage périodique
+                        if student.step_count > student.config.learning_starts and student.step_count % 10 == 0:
+                            student.learn()
+                        
+                        student.step_count += 1
+                        obs_state = next_obs
+                    
                     # Mise à jour Teacher
                     if teacher is not None and 'concentration' in info:
                         teacher.add_observation(
@@ -4002,7 +4242,7 @@ def run_position_tests(iterations, steps, mode):
                             info['concentration']
                         )
                     
-                    # Enregistrement détection
+                    # Enregistrement détection - Vérifier toutes les fuites configurées
                     if info.get('detected', False) or (info.get('measured_concentration', 0) > sensor_config.detection_threshold):
                         detection_count += 1
                         validator.add_detection(
@@ -4016,7 +4256,7 @@ def run_position_tests(iterations, steps, mode):
                         if 'concentration' in info:
                             gradient = np.array([grad_x, grad_y, 0.0])
                             timestamp = step * env_config.time_step
-                            enhanced_detector.validate_detection(
+                            detection_event = enhanced_detector.validate_detection(
                                 position=env.drone_position,
                                 measured_concentration=info.get('measured_concentration', 0),
                                 real_concentration=info.get('concentration', 0),
@@ -4024,6 +4264,30 @@ def run_position_tests(iterations, steps, mode):
                                 timestamp=timestamp,
                                 gradient=gradient
                             )
+                            
+                            # Si une fuite est détectée, l'ajouter à la liste
+                            if detection_event and detection_event.is_valid:
+                                temp_estimated, temp_confidence = enhanced_detector.estimate_leak_position()
+                                if temp_estimated is not None:
+                                    # Vérifier si cette fuite n'est pas déjà détectée (dans un rayon de 5m)
+                                    is_duplicate = False
+                                    for detected in all_detected_leaks_per_position:
+                                        dist = np.linalg.norm(temp_estimated - np.array(detected['position']))
+                                        if dist < 5.0:
+                                            is_duplicate = True
+                                            # Mettre à jour la confiance si plus élevée
+                                            if temp_confidence > detected['confidence']:
+                                                detected['confidence'] = temp_confidence
+                                                detected['position'] = temp_estimated.tolist()
+                                            break
+                                    
+                                    if not is_duplicate:
+                                        all_detected_leaks_per_position.append({
+                                            'position': temp_estimated.tolist(),
+                                            'confidence': temp_confidence,
+                                            'step': step,
+                                            'time': timestamp
+                                        })
                     
                     if terminated or truncated:
                         break
@@ -4034,12 +4298,21 @@ def run_position_tests(iterations, steps, mode):
                 
                 # Estimation GP de la position
                 estimated_pos, estimation_confidence = enhanced_detector.estimate_leak_position()
+                gp_used = enhanced_detector.use_gp_validator
+                
+                # Statistiques du détecteur
+                detector_stats = enhanced_detector.get_statistics()
+                estimation_stable = detector_stats.get('estimation_stable', False)
+                
                 if estimated_pos is not None:
                     # Utiliser la position estimée GP pour les métriques
                     error_gp = np.linalg.norm(estimated_pos - np.array(true_leak_pos))
                     if metrics.localization_accuracy:
                         metrics.localization_accuracy.error_distance = error_gp
                         metrics.localization_accuracy.detected_position = estimated_pos
+                else:
+                    error_gp = None
+                    estimation_confidence = 0.0
                 
                 elapsed_time = time.time() - start_time
                 total_detections += metrics.n_detections
@@ -4047,8 +4320,8 @@ def run_position_tests(iterations, steps, mode):
                 total_energy += info.get('total_energy', 0)
                 
                 # Précision basée sur l'erreur de localisation (GP si disponible)
-                if metrics.localization_accuracy:
-                    error_dist = metrics.localization_accuracy.error_distance
+                if metrics.localization_accuracy and error_gp is not None:
+                    error_dist = error_gp
                     # Précision = 100% si erreur < tolérance, sinon décroît
                     if error_dist <= metrics.localization_accuracy.tolerance_radius:
                         precision = 100 * (1 - error_dist / metrics.localization_accuracy.tolerance_radius)
@@ -4057,8 +4330,29 @@ def run_position_tests(iterations, steps, mode):
                         precision = max(0, 100 - 10 * (error_dist - metrics.localization_accuracy.tolerance_radius))
                 else:
                     precision = 0
+                    error_dist = None
                 
                 total_precision += precision
+                
+                # Stocker les métriques détaillées pour cette itération
+                iteration_metrics = {
+                    'position_key': position_key,
+                    'iteration': iteration,
+                    'detections': metrics.n_detections,
+                    'time': elapsed_time,
+                    'energy': info.get('total_energy', 0),
+                    'precision': precision,
+                    'error_distance': error_dist if error_dist is not None else float('inf'),
+                    'gp_confidence': estimation_confidence,
+                    'gp_used': gp_used,
+                    'estimation_stable': estimation_stable,
+                    'success': precision > 70,  # Succès si précision > 70%
+                    'detection_rate': metrics.detection_rate if hasattr(metrics, 'detection_rate') else 0.0,
+                    'final_distance': metrics.localization_accuracy.final_distance if metrics.localization_accuracy else None
+                }
+                
+                # Ajouter à la liste globale
+                all_iteration_metrics.append(iteration_metrics)
                 
             except Exception as e:
                 log_message(f"Erreur lors du test {position_key}, iteration {iteration+1}: {e}")
@@ -4070,6 +4364,25 @@ def run_position_tests(iterations, steps, mode):
         avg_energy = total_energy / iterations
         avg_precision = total_precision / iterations if iterations > 0 else 0
         
+        # Calculer les statistiques détaillées depuis les métriques d'itération
+        # Filtrer les métriques pour cette position
+        pos_iterations = [m for m in all_iteration_metrics if m['position_key'] == position_key]
+        
+        if pos_iterations:
+            avg_error = np.mean([m['error_distance'] for m in pos_iterations if m['error_distance'] != float('inf')]) if pos_iterations else None
+            avg_gp_confidence = np.mean([m['gp_confidence'] for m in pos_iterations]) if pos_iterations else 0.0
+            gp_usage_rate = np.mean([1 if m['gp_used'] else 0 for m in pos_iterations]) * 100 if pos_iterations else 0.0
+            stability_rate = np.mean([1 if m['estimation_stable'] else 0 for m in pos_iterations]) * 100 if pos_iterations else 0.0
+            avg_detection_rate = np.mean([m['detection_rate'] for m in pos_iterations]) * 100 if pos_iterations else 0.0
+            avg_final_distance = np.mean([m['final_distance'] for m in pos_iterations if m['final_distance'] is not None]) if pos_iterations else None
+        else:
+            avg_error = None
+            avg_gp_confidence = 0.0
+            gp_usage_rate = 0.0
+            stability_rate = 0.0
+            avg_detection_rate = 0.0
+            avg_final_distance = None
+        
         # Statut basé sur la précision et le taux de succès
         success_rate = successful_detections / iterations if iterations > 0 else 0
         if avg_precision > 85 and success_rate > 0.8:
@@ -4079,16 +4392,34 @@ def run_position_tests(iterations, steps, mode):
         else:
             status = "Echec"
         
+        # Obtenir le mode d'affichage (utiliser test_mode_value de la boucle)
+        mode_display = get_mode_display_name(test_mode_value)
+        
+        # Informations sur les fuites détectées (moyenne sur toutes les itérations)
+        # Compter le nombre moyen de fuites détectées par itération
+        avg_n_leaks = len(all_detected_leaks_per_position) / iterations if iterations > 0 else 0
+        leaks_info = f"{avg_n_leaks:.1f} fuite(s)" if avg_n_leaks > 0 else "Aucune"
+        
         test_results.append({
             'position': position_key,
+            'mode': mode_display,
             'detections': f"{avg_detections:.1f}",
-            'time': f"{avg_time:.1f}s",
+            'time': f"{avg_time:.2f}s",
             'energy': f"{avg_energy:.1f}J",
             'precision': f"{avg_precision:.1f}%",
+            'error_distance': f"{avg_error:.2f}m" if avg_error is not None and avg_error != float('inf') else "N/A",
+            'gp_confidence': f"{avg_gp_confidence:.1%}",
+            'gp_used': "Oui" if gp_usage_rate > 50 else "Non",
+            'stability': f"{stability_rate:.1f}%",
+            'detection_rate': f"{avg_detection_rate:.1f}%",
+            'final_distance': f"{avg_final_distance:.2f}m" if avg_final_distance is not None else "N/A",
+            'success_rate': f"{success_rate:.1%}",
+            'leaks_detected': leaks_info,
+            'n_leaks': f"{avg_n_leaks:.1f}",
             'status': status
         })
         
-        log_message(f"   {position_key}: {avg_precision:.1f}% précision, {avg_detections:.1f} détections")
+        log_message(f"   {position_key} ({mode_display}): {avg_precision:.1f}% précision, {avg_detections:.1f} détections, Erreur: {avg_error:.2f}m" if avg_error else f"   {position_key} ({mode_display}): {avg_precision:.1f}% précision, {avg_detections:.1f} détections")
     
     progress_bar.progress(1.0)
     status_text.empty()
