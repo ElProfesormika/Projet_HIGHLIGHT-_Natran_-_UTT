@@ -5,23 +5,24 @@
 
 ---
 
-## 🎯 État d'Avancement
+## État d'Avancement
 
 ### Système Opérationnel
 - ✅ Architecture Teacher-Student implémentée et optimisée
 - ✅ Interface Streamlit interactive avec visualisations en temps réel
-- ✅ Validateur GP avec arrêt automatique (confiance ≥ 85%)
+- ✅ Validateur GP avec détection multi-fuites (toutes les positions avec probabilité élevée)
 - ✅ Stratégie multi-phase pour convergence précise
 - ✅ Tests de robustesse validés (>90% taux de détection)
 
 ### Dernières Améliorations
 - **Reconnaissance de zone améliorée** : Le système évite désormais le dépassement et converge précisément vers la source
 - **Visualisation temps réel** : Carte de confiance GP mise à jour dynamiquement
-- **Auto-stop intelligent** : Arrêt automatique dès que la position est estimée avec haute confiance
+- **Détection complète** : Extraction de toutes les positions avec probabilité élevée de la carte GP
+- **Tri intelligent** : Positions automatiquement triées par probabilité décroissante
 
 ---
 
-## 🧠 Logique de la Méthode
+## Logique de la Méthode
 
 ### Approche Teacher-Student
 
@@ -56,7 +57,7 @@ R = α · Gain d'information - β · Coût énergétique
 
 ---
 
-## ⚙️ Paramétrage via l'Application
+## Paramétrage via l'Application
 
 L'interface Streamlit offre un contrôle complet sur tous les paramètres du système via 5 onglets de configuration :
 
@@ -116,16 +117,16 @@ L'interface Streamlit offre un contrôle complet sur tous les paramètres du sys
 - Configuration de plusieurs positions de fuites pour tests de robustesse
 - Configurations prédéfinies disponibles (circulaire, grille, etc.)
 
-### Configuration Optimale Concours
+### Détection Multi-Fuites
 
-Un bouton **"Charger Config Optimale Concours"** permet d'appliquer instantanément tous les paramètres optimaux validés pour obtenir :
-- **Taux de détection** : 92-95%
-- **Précision** : <2m d'erreur
-- **Efficacité énergétique** : +138% vs baseline
+Le système peut maintenant détecter plusieurs positions de fuite simultanément :
+- **Extraction complète** : Toutes les positions avec probabilité élevée sont extraites de la carte GP
+- **Tri automatique** : Positions triées par probabilité décroissante (meilleure en premier)
+- **Statistiques précises** : La meilleure position est utilisée pour les métriques
 
 ---
 
-## 📊 Étude de Performance
+## Étude de Performance
 
 ### Résultats Clés (10 runs, environnement 100×100m)
 
@@ -146,12 +147,12 @@ Un bouton **"Charger Config Optimale Concours"** permet d'appliquer instantaném
 ### Observations
 
 1. **Convergence stable** : Le système converge vers la source sans dépassement grâce à la stratégie multi-phase
-2. **Auto-stop efficace** : 85% des simulations s'arrêtent automatiquement avec confiance ≥ 85%
+2. **Détection multi-fuites efficace** : Toutes les positions avec probabilité élevée sont détectées et triées
 3. **Robustesse** : Performance maintenue sous différentes conditions (bruit, vent, position initiale)
 
 ---
 
-## 🚀 Prochaines Étapes
+## Prochaines Étapes
 
 - [ ] Tests sur données réelles (si disponibles)
 - [ ] Optimisation fine des hyperparamètres

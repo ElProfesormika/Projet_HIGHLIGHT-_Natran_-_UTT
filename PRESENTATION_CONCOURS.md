@@ -94,7 +94,8 @@ Le système inclut une **validation automatique** qui :
 4. **Teacher (GP)** : Processus Gaussiens pour apprentissage actif avec convergence multi-phase
 5. **Student (RL)** : Réseau de neurones pour navigation optimale
 6. **Détecteur Amélioré** : Validation multi-critères des détections avec clustering et filtrage temporel
-7. **Validateur GP** : Estimation probabiliste de position de fuite par Processus Gaussien avec arrêt automatique
+7. **Validateur GP** : Estimation probabiliste de toutes les positions de fuite par Processus Gaussien
+8. **Extraction complète** : Retourne toutes les positions détectées, pas seulement la meilleure
 8. **Validateur de Performance** : Comparaison automatique des résultats
 
 ### Flux de Données

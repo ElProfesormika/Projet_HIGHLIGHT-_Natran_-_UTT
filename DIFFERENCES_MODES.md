@@ -1,6 +1,6 @@
 # Différences entre les Modes de Simulation
 
-## 📊 Vue d'Ensemble
+## Vue d'Ensemble
 
 HIGHLIGHT+ propose trois modes de simulation pour la détection de fuites de méthane :
 
@@ -10,7 +10,7 @@ HIGHLIGHT+ propose trois modes de simulation pour la détection de fuites de mé
 
 ---
 
-## 🔍 Différence Principale : `teacher_student` vs `full_learning`
+## Différence Principale : `teacher_student` vs `full_learning`
 
 ### Mode `teacher_student` (Expert Seul)
 
@@ -80,7 +80,7 @@ HIGHLIGHT+ propose trois modes de simulation pour la détection de fuites de mé
 
 ---
 
-## 📈 Comparaison des Performances
+## Comparaison des Performances
 
 | Critère | `teacher_student` | `full_learning` |
 |---------|-------------------|-----------------|
@@ -93,7 +93,7 @@ HIGHLIGHT+ propose trois modes de simulation pour la détection de fuites de mé
 
 ---
 
-## 🎯 Quand Utiliser Chaque Mode ?
+## Quand Utiliser Chaque Mode ?
 
 ### Utilisez `teacher_student` si :
 - ✅ Vous voulez une **détection immédiate et fiable**
@@ -109,7 +109,7 @@ HIGHLIGHT+ propose trois modes de simulation pour la détection de fuites de mé
 
 ---
 
-## 🔧 Améliorations Récentes du Mode `full_learning`
+## Améliorations Récentes du Mode `full_learning`
 
 Pour résoudre le problème de performance initiale, nous avons implémenté :
 
@@ -132,7 +132,7 @@ Pour résoudre le problème de performance initiale, nous avons implémenté :
 
 ---
 
-## 💡 Conclusion
+## Conclusion
 
 - **`teacher_student`** : Mode expert, stable, rapide, optimal pour détection unique
 - **`full_learning`** : Mode adaptatif, optimal à long terme, meilleur pour détections multiples

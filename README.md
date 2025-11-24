@@ -52,7 +52,9 @@ D'après les tests expérimentaux et l'analyse détaillée :
 - **Intelligence adaptative** : Apprentissage en temps réel
 - **Validation automatique** : Comparaison position réelle vs détectée
 - **Validateur GP** : Estimation probabiliste de la position de fuite avec Processus Gaussiens
-- **Arrêt automatique** : Simulation s'arrête automatiquement quand confiance ≥ 85%
+- **Détection multi-fuites** : Détection de toutes les positions de fuite avec probabilité élevée sur la carte GP
+- **Extraction complète** : Retourne toutes les positions détectées (pas seulement la meilleure)
+- **Tri intelligent** : Positions triées par probabilité GP décroissante (meilleure en premier)
 - **Reconnaissance de zone** : Stratégie multi-phase pour convergence précise sans dépassement
 
 ## Architecture du Système
@@ -96,8 +98,10 @@ python launch_app.py
 - Gestion des positions de fuites multiples
 - Simulation avec validation automatique
 - **Visualisation en temps réel** : Carte de confiance GP et trajectoire du drone
-- **Détection automatique** : Arrêt automatique quand position estimée avec confiance ≥ 85%
-- **Position estimée visible** : Marqueur clair sur la carte de confiance GP
+- **Détection multi-fuites** : Détection de toutes les positions avec probabilité élevée sur la carte GP
+- **Affichage complet** : Toutes les positions détectées affichées avec leur probabilité GP
+- **Tri automatique** : Positions triées par probabilité décroissante (meilleure en premier)
+- **Statistiques précises** : La meilleure position (probabilité la plus élevée) est utilisée pour les métriques
 - Export des résultats (JSON, rapports)
 - Métriques de performance conformes à l'analyse
 
@@ -154,23 +158,21 @@ Le système inclut un **validateur de performance** automatique qui :
 
 ## Documentation
 
-- **[ANALYSE_APPRENTISSAGE_IA.md](ANALYSE_APPRENTISSAGE_IA.md)** - Analyse détaillée de l'IA et des performances
-- **[VALIDATION_PERFORMANCE.md](VALIDATION_PERFORMANCE.md)** - Documentation du système de validation
+- **[RAPPORT_PRESENTATION_DETAILLE.md](RAPPORT_PRESENTATION_DETAILLE.md)** - Rapport de présentation détaillé (LaTeX disponible)
+- **[RAPPORT_AVANCEMENT_BREF.md](RAPPORT_AVANCEMENT_BREF.md)** - Rapport d'avancement bref pour suiveurs
+- **[DIFFERENCES_MODES.md](DIFFERENCES_MODES.md)** - Explication des différences entre les modes de simulation
+- **[MODELE_TRAJECTOIRE_DRONE.md](MODELE_TRAJECTOIRE_DRONE.md)** - Explication du modèle de trajectoire du drone
+- **[NOUVELLES_FONCTIONNALITES.md](NOUVELLES_FONCTIONNALITES.md)** - Récapitulatif des fonctionnalités principales
 - **[PRESENTATION_CONCOURS.md](PRESENTATION_CONCOURS.md)** - Présentation complète pour le concours
 - **[LIVRABLES_CONCOURS.md](LIVRABLES_CONCOURS.md)** - Liste des livrables et guide d'utilisation
-- **[PARAMETRES_OPTIMISATION_DETECTION.md](PARAMETRES_OPTIMISATION_DETECTION.md)** - Guide d'optimisation des paramètres
-- **[AMELIORATION_PRECISION_LOCALISATION.md](AMELIORATION_PRECISION_LOCALISATION.md)** - Guide d'amélioration de la précision
-- **[AMELIORATIONS_DETECTION_EXCELLENTE.md](AMELIORATIONS_DETECTION_EXCELLENTE.md)** - Améliorations pour détection excellente
-- **[AMELIORATION_RECONNAISSANCE_ZONE.md](AMELIORATION_RECONNAISSANCE_ZONE.md)** - Amélioration de la reconnaissance de zone et convergence
-- **[GUIDE_OPTIMISATION_CONCOURS.md](GUIDE_OPTIMISATION_CONCOURS.md)** - Configuration optimale pour le concours
-- **[CORRESPONDANCE_ACADEMIQUE.md](CORRESPONDANCE_ACADEMIQUE.md)** - Correspondance entre théorie et implémentation
-- **[NOUVELLES_FONCTIONNALITES.md](NOUVELLES_FONCTIONNALITES.md)** - Récapitulatif des nouvelles fonctionnalités
+- **[VALIDATION_PERFORMANCE.md](VALIDATION_PERFORMANCE.md)** - Documentation du système de validation
+- **[ANALYSE_APPRENTISSAGE_IA.md](ANALYSE_APPRENTISSAGE_IA.md)** - Analyse détaillée de l'IA et des performances
 
 ## Équipe
 
-- **Housséni YABRE** - Lead AI Engineer
-- **Kabinet SYLLA** - Simulation & Physics
-- **Nobert Bassooma DIDANERA** - System Integration
+- **Housséni YABRE** - Etudiant en Informatique et Systèmes d'Information à l'UTT
+- **Kabinet SYLLA** - Etudiant en Informatique et Systèmes d'Information à l'UTT
+- **Nobert Bassooma DIDANERA** - Etudiant en fin de parcours IA et Big Data ( En mobilité à l'UTT)
 
 ## Note Importante
 
@@ -178,11 +180,14 @@ Le système inclut un **validateur de performance** automatique qui :
 
 **Fiabilité** : Le système inclut une validation automatique qui compare les positions détectées avec les positions réelles configurées, permettant de prouver la fiabilité du modèle.
 
-**Nouvelles fonctionnalités** :
+**Fonctionnalités avancées** :
 - **Validateur GP** : Utilise un Processus Gaussien pour estimer la position de fuite avec probabilité
-- **Arrêt automatique** : La simulation s'arrête automatiquement quand la position est estimée avec confiance ≥ 85%
-- **Visualisation améliorée** : Carte de confiance GP en temps réel avec position estimée clairement visible
-- **Mode Full Learning amélioré** : Intégration complète GP + Teacher + Student pour détection optimale
+- **Détection multi-fuites** : Extrait toutes les positions avec probabilité élevée de la carte de confiance GP
+- **Extraction complète** : Retourne toutes les positions détectées, pas seulement la meilleure
+- **Tri intelligent** : Positions automatiquement triées par probabilité GP décroissante
+- **Statistiques optimisées** : La meilleure position (probabilité la plus élevée) est utilisée pour toutes les métriques
+- **Visualisation améliorée** : Carte de confiance GP en temps réel avec toutes les positions détectées clairement visibles
+- **Mode Teacher-Student amélioré** : Intégration complète GP + Teacher + Student pour détection optimale
 
 ## Licence
 

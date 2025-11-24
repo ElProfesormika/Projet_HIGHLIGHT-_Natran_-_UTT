@@ -2071,8 +2071,8 @@ def show_results_tab():
     all_detected_leaks = st.session_state.get('detected_leaks', [])
     if all_detected_leaks:
         st.markdown("---")
-        st.markdown('<div class="subsection-header">📍 Fuites Détectées (Mode Multi-Fuites)</div>', unsafe_allow_html=True)
-        st.success(f"✅ **{len(all_detected_leaks)} point(s) de fuite détecté(s)**")
+        st.markdown('<div class="subsection-header">Fuite(s) Détectée(s) (Mode Multi-Fuites)</div>', unsafe_allow_html=True)
+        st.success(f"**{len(all_detected_leaks)} point(s) de fuite détecté(s)**")
         
         # IMPORTANT : Trier les positions par probabilité GP décroissante (meilleure en premier)
         # La probabilité GP est la confiance stockée dans detected_leaks
@@ -2091,7 +2091,7 @@ def show_results_tab():
             for i, leak in enumerate(all_detected_leaks_sorted)
         ])
         st.dataframe(leaks_df, use_container_width=True, hide_index=True)
-        st.info("💡 **Note** : En mode multi-fuites, le système continue la recherche après chaque détection pour identifier toutes les fuites.")
+        st.info("**Note** : En mode multi-fuites, le système continue la recherche après chaque détection pour identifier toutes les fuites.")
     
     display_performance_metrics(results)
     
@@ -2819,7 +2819,7 @@ def display_test_results():
     
     # Résumé global en haut
     st.markdown("---")
-    st.markdown("### 📊 Résumé Global des Tests")
+    st.markdown("### Résumé Global des Tests")
     
     col_sum1, col_sum2, col_sum3, col_sum4, col_sum5 = st.columns(5)
     
@@ -2853,7 +2853,7 @@ def display_test_results():
     
     # Tableau détaillé avec toutes les informations
     st.markdown("---")
-    st.markdown("### 📋 Détails par Position")
+    st.markdown("### Détails par Position")
     
     # Réorganiser les colonnes pour meilleure lisibilité
     display_columns = ['position', 'mode', 'status', 'precision', 'error_distance', 'gp_confidence', 
@@ -2891,7 +2891,7 @@ def display_test_results():
     
     # Graphiques de visualisation
     st.markdown("---")
-    st.markdown("### 📈 Visualisations")
+    st.markdown("### Visualisations")
     
     col1, col2 = st.columns(2)
     
@@ -2973,7 +2973,7 @@ def display_test_results():
     
     # Analyse détaillée par statut
     st.markdown("---")
-    st.markdown("### 📊 Analyse par Statut")
+    st.markdown("### Analyse par Statut")
     
     status_summary = df_results.groupby('status').agg({
         'position': 'count',
@@ -4141,16 +4141,16 @@ def run_simulation():
                                     removed_source = undetected_sources.pop(closest_source_idx)
                                     log_message(f"   Source ({removed_source[0]:.1f}, {removed_source[1]:.1f}) retirée de la liste des cibles. {len(undetected_sources)} source(s) restante(s).")
                             
-                            log_message(f"⚠️ POINT DE FUITE DÉTECTÉ: ({est_pos[0]:.2f}, {est_pos[1]:.2f}) m | Confiance: {est_conf:.1%}")
+                            log_message(f"POINT DE FUITE DETECTE: ({est_pos[0]:.2f}, {est_pos[1]:.2f}) m | Confiance: {est_conf:.1%}")
                     
                     if new_detections_count > 0:
                         log_message(f"   {new_detections_count} nouvelle(s) position(s) détectée(s) sur la carte GP. Total: {len(st.session_state.detected_leaks)} position(s).")
                         log_message(f"   La recherche continue pour détecter d'autres fuites...")
                         # Afficher une notification mais continuer
                         if new_detections_count == 1:
-                            st.warning(f"🔍 **Point de fuite détecté** : ({all_estimated_positions[0][0][0]:.2f}, {all_estimated_positions[0][0][1]:.2f}) m | Confiance: {all_estimated_positions[0][1]:.1%} | La recherche continue...")
+                            st.warning(f"**Point de fuite detecte** : ({all_estimated_positions[0][0][0]:.2f}, {all_estimated_positions[0][0][1]:.2f}) m | Confiance: {all_estimated_positions[0][1]:.1%} | La recherche continue...")
                         else:
-                            st.warning(f"🔍 **{new_detections_count} point(s) de fuite détecté(s)** sur la carte GP | Total: {len(st.session_state.detected_leaks)} position(s) | La recherche continue...")
+                            st.warning(f"**{new_detections_count} point(s) de fuite detecte(s)** sur la carte GP | Total: {len(st.session_state.detected_leaks)} position(s) | La recherche continue...")
             
             # Progression
             progress = (step + 1) / ai_config['max_steps'] * 100
@@ -4465,13 +4465,13 @@ def run_simulation():
         if all_estimated_positions:
             # Prendre la première position (probabilité la plus élevée) pour les métriques
             estimated_pos, estimation_confidence = all_estimated_positions[0]
-            log_message(f"✅ {len(all_estimated_positions)} position(s) détectée(s) sur la carte GP. Meilleure: ({estimated_pos[0]:.2f}, {estimated_pos[1]:.2f}) m, confiance: {estimation_confidence:.1%}")
+            log_message(f"SUCCES: {len(all_estimated_positions)} position(s) detectee(s) sur la carte GP. Meilleure: ({estimated_pos[0]:.2f}, {estimated_pos[1]:.2f}) m, confiance: {estimation_confidence:.1%}")
         else:
             # Fallback : utiliser estimate_leak_position() pour la meilleure position
             estimated_pos, estimation_confidence = enhanced_detector.estimate_leak_position()
             if estimated_pos is not None:
                 all_estimated_positions = [(estimated_pos, estimation_confidence)]
-                log_message(f"✅ Position détectée (fallback): ({estimated_pos[0]:.2f}, {estimated_pos[1]:.2f}) m, confiance: {estimation_confidence:.1%}")
+                log_message(f"SUCCES: Position detectee (fallback): ({estimated_pos[0]:.2f}, {estimated_pos[1]:.2f}) m, confiance: {estimation_confidence:.1%}")
         
         # Calcul des métriques de performance (avant de mettre à jour avec GP)
         performance_metrics = validator.compute_metrics()
@@ -4502,12 +4502,12 @@ def run_simulation():
                     })
                 # S'assurer que la liste est triée par probabilité décroissante
                 st.session_state.detected_leaks.sort(key=lambda x: x.get('confidence', 0.0), reverse=True)
-                log_message(f"📊 {len(all_estimated_positions)} position(s) stockée(s) dans detected_leaks (triées par probabilité GP)")
+                log_message(f"INFO: {len(all_estimated_positions)} position(s) stockee(s) dans detected_leaks (triees par probabilite GP)")
         
         # IMPORTANT : La meilleure position (première dans la liste, probabilité la plus élevée) 
         # est utilisée pour toutes les métriques et statistiques
         if all_estimated_positions:
-            log_message(f"📈 Position utilisée pour statistiques: ({estimated_pos[0]:.2f}, {estimated_pos[1]:.2f}) m (confiance: {estimation_confidence:.1%})")
+            log_message(f"INFO: Position utilisee pour statistiques: ({estimated_pos[0]:.2f}, {estimated_pos[1]:.2f}) m (confiance: {estimation_confidence:.1%})")
         
         # AMÉLIORATION : Calculer les métriques pour toutes les positions détectées (multi-fuites)
         all_detected_leaks = st.session_state.get('detected_leaks', [])

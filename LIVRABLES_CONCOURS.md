@@ -22,11 +22,12 @@ python launch_app.py
 - Gestion des positions de fuites multiples
 - Simulation avec validation automatique
 - **Visualisation en temps réel** :
-  - Carte de confiance GP avec position estimée clairement visible (marqueur rouge avec cercle de confiance)
+  - Carte de confiance GP avec toutes les positions détectées clairement visibles
   - Trajectoire du drone mise à jour en temps réel
   - Métriques dynamiques (étape, détections, énergie, erreur localisation)
-- **Arrêt automatique** : Simulation s'arrête quand position estimée avec confiance ≥ 85%
-- **Position estimée visible** : Marqueur clair sur la carte avec annotation
+- **Détection multi-fuites** : Extrait toutes les positions avec probabilité élevée de la carte GP
+- **Tri intelligent** : Positions automatiquement triées par probabilité décroissante (meilleure en premier)
+- **Affichage complet** : Toutes les positions détectées affichées avec leur probabilité GP
 - Export des résultats (JSON, rapports)
 
 ### 3. Démonstrations
@@ -39,14 +40,14 @@ python demo.py
 ### 4. Documentation
 
 - **[README.md](README.md)** - Documentation principale
-- **[ANALYSE_APPRENTISSAGE_IA.md](ANALYSE_APPRENTISSAGE_IA.md)** - Analyse détaillée de l'IA
-- **[VALIDATION_PERFORMANCE.md](VALIDATION_PERFORMANCE.md)** - Système de validation
+- **[RAPPORT_PRESENTATION_DETAILLE.md](RAPPORT_PRESENTATION_DETAILLE.md)** - Rapport de présentation détaillé
+- **[RAPPORT_AVANCEMENT_BREF.md](RAPPORT_AVANCEMENT_BREF.md)** - Rapport d'avancement bref
+- **[DIFFERENCES_MODES.md](DIFFERENCES_MODES.md)** - Explication des modes de simulation
+- **[MODELE_TRAJECTOIRE_DRONE.md](MODELE_TRAJECTOIRE_DRONE.md)** - Modèle de trajectoire du drone
+- **[NOUVELLES_FONCTIONNALITES.md](NOUVELLES_FONCTIONNALITES.md)** - Fonctionnalités principales
 - **[PRESENTATION_CONCOURS.md](PRESENTATION_CONCOURS.md)** - Présentation complète
-- **[PARAMETRES_OPTIMISATION_DETECTION.md](PARAMETRES_OPTIMISATION_DETECTION.md)** - Guide d'optimisation
-- **[AMELIORATION_PRECISION_LOCALISATION.md](AMELIORATION_PRECISION_LOCALISATION.md)** - Guide de précision
-- **[AMELIORATIONS_DETECTION_EXCELLENTE.md](AMELIORATIONS_DETECTION_EXCELLENTE.md)** - Améliorations pour détection excellente
-- **[AMELIORATION_RECONNAISSANCE_ZONE.md](AMELIORATION_RECONNAISSANCE_ZONE.md)** - Amélioration de la reconnaissance de zone
-- **[GUIDE_OPTIMISATION_CONCOURS.md](GUIDE_OPTIMISATION_CONCOURS.md)** - Configuration optimale pour le concours
+- **[VALIDATION_PERFORMANCE.md](VALIDATION_PERFORMANCE.md)** - Système de validation
+- **[ANALYSE_APPRENTISSAGE_IA.md](ANALYSE_APPRENTISSAGE_IA.md)** - Analyse détaillée de l'IA
 
 ## Utilisation Rapide
 
@@ -116,9 +117,10 @@ Natran_x_UTT/
 - Interface Streamlit : Configuration → Simulation → Validation
 - Métriques de validation automatique
 - Comparaison position réelle vs détectée
-- **Validateur GP** : Estimation probabiliste avec arrêt automatique
-- **Visualisation temps réel** : Carte de confiance GP avec position estimée visible
-- **Message** : "Système validé avec preuve de fiabilité et détection automatique"
+- **Validateur GP** : Estimation probabiliste de toutes les positions de fuite
+- **Détection multi-fuites** : Extraction de toutes les positions avec probabilité élevée
+- **Visualisation temps réel** : Carte de confiance GP avec toutes les positions détectées visibles
+- **Message** : "Système validé avec preuve de fiabilité et détection multi-fuites"
 
 ### Slide 5 : Démonstration
 - Démonstration live de l'interface Streamlit

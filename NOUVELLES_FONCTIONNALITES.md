@@ -4,26 +4,29 @@
 
 Ce document récapitule les dernières améliorations apportées au système HIGHLIGHT+ pour garantir une détection excellente et une expérience utilisateur optimale.
 
-## 1. Validateur GP avec Arrêt Automatique
+## 1. Validateur GP avec Détection Multi-Fuites
 
 ### Fonctionnalité
 
 Le système utilise maintenant un **Validateur GP** (Processus Gaussien) qui :
 - Accumule les mesures de concentration au fil du temps
 - Modélise la carte de concentration avec un GP
-- Estime la position de fuite avec une probabilité de confiance
-- **Arrête automatiquement la simulation** quand la confiance ≥ 85%
+- **Extrait TOUTES les positions de fuite** avec probabilité élevée de la carte GP
+- Retourne toutes les positions détectées, pas seulement la meilleure
+- Trie automatiquement les positions par probabilité décroissante (meilleure en premier)
 
 ### Avantages
 
 - **Détection précoce** : Minimum 2 mesures (au lieu de 3)
 - **Précision améliorée** : Grille fine (150x150) si peu de mesures
-- **Arrêt intelligent** : Économie de temps et d'énergie
+- **Détection complète** : Toutes les positions avec probabilité élevée sont détectées
+- **Tri intelligent** : Positions automatiquement triées par probabilité GP décroissante
+- **Statistiques optimisées** : La meilleure position (probabilité la plus élevée) est utilisée pour les métriques
 - **Robustesse** : Filtrage automatique des zones avec trop d'incertitude
 
 ### Utilisation
 
-La position estimée est automatiquement utilisée comme résultat final et affichée clairement sur la carte de confiance GP.
+Toutes les positions détectées sont affichées avec leur probabilité GP. La meilleure position (probabilité la plus élevée) est utilisée pour toutes les statistiques et métriques.
 
 ## 2. Visualisation en Temps Réel Améliorée
 
@@ -43,7 +46,7 @@ L'interface Streamlit affiche maintenant :
 
 - Carte GP : Toutes les 20 étapes
 - Métriques : Toutes les 10 étapes
-- Position estimée : Toutes les 5 étapes (pour arrêt automatique rapide)
+- Position estimée : Toutes les 3-5 étapes (pour mise à jour fréquente de toutes les positions)
 
 ## 3. Mode Full Learning Amélioré
 
@@ -113,8 +116,8 @@ Le système utilise maintenant **prioritairement** la position estimée du GP co
 ### Affichage
 
 - **Message de succès** : Position estimée et confiance affichées
-- **Animation de célébration** : Si confiance ≥ 85%
-- **Message d'info** : Pour arrêt automatique
+- **Affichage de toutes les positions** : Toutes les positions détectées avec leur probabilité GP
+- **Tri automatique** : Positions triées par probabilité décroissante
 - **Logs détaillés** : Section "POSITION ESTIMEE FINALE (GP VALIDATOR)"
 
 ## 6. Détection de Stabilité
@@ -138,26 +141,27 @@ La stabilité de l'estimation peut être utilisée pour :
 | Fonctionnalité | Avant | Maintenant |
 |----------------|-------|------------|
 | **Estimation position** | Statistique uniquement | GP + Statistique (priorité GP) |
-| **Arrêt simulation** | Manuel ou max étapes | Automatique si confiance ≥ 85% |
-| **Visualisation** | Statique | Temps réel (carte GP + trajectoire) |
-| **Position estimée** | Peu visible | Très visible (marqueur + cercle + texte) |
+| **Détection** | Position unique | Toutes les positions avec probabilité élevée |
+| **Tri** | Non | Automatique par probabilité décroissante |
+| **Visualisation** | Statique | Temps réel (carte GP + trajectoire + toutes positions) |
+| **Positions estimées** | Peu visible | Toutes visibles (marqueurs + cercles + probabilités) |
 | **Mode full_learning** | Student + Gradient | Student + Teacher + GP (toutes phases) |
 | **Reconnaissance zone** | Gradient simple | Multi-phase selon distance |
-| **Résultat final** | Position détectée | Position estimée GP (priorité) |
+| **Résultat final** | Position détectée | Toutes positions estimées GP (triées par probabilité) |
 
 ## Impact sur les Performances
 
 - **Détection plus précoce** : Minimum 2 mesures (au lieu de 3)
 - **Précision améliorée** : Grille fine et filtrage d'incertitude
 - **Convergence meilleure** : Stratégie multi-phase évite dépassement
-- **Expérience utilisateur** : Visualisation claire et arrêt automatique
+- **Expérience utilisateur** : Visualisation claire de toutes les positions détectées
 - **Robustesse** : Fallbacks multiples et détection de stabilité
 
 ## Documentation Associée
 
-- **[AMELIORATIONS_DETECTION_EXCELLENTE.md](AMELIORATIONS_DETECTION_EXCELLENTE.md)** - Détails sur les améliorations de détection
-- **[AMELIORATION_RECONNAISSANCE_ZONE.md](AMELIORATION_RECONNAISSANCE_ZONE.md)** - Détails sur la reconnaissance de zone
-- **[GUIDE_OPTIMISATION_CONCOURS.md](GUIDE_OPTIMISATION_CONCOURS.md)** - Configuration optimale pour le concours
+- **[DIFFERENCES_MODES.md](DIFFERENCES_MODES.md)** - Explication des modes de simulation
+- **[MODELE_TRAJECTOIRE_DRONE.md](MODELE_TRAJECTOIRE_DRONE.md)** - Modèle de trajectoire du drone
+- **[RAPPORT_PRESENTATION_DETAILLE.md](RAPPORT_PRESENTATION_DETAILLE.md)** - Rapport de présentation détaillé
 
 ## Utilisation
 
@@ -168,5 +172,5 @@ Pour utiliser :
 2. Configurer les paramètres (ou charger la config optimale)
 3. Lancer la simulation
 4. Observer la visualisation en temps réel
-5. La simulation s'arrêtera automatiquement quand la position est estimée avec confiance ≥ 85%
+5. Toutes les positions avec probabilité élevée seront détectées et affichées, triées par probabilité décroissante
 
