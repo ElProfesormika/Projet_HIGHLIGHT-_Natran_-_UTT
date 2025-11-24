@@ -257,7 +257,7 @@ class EnhancedDetector:
         2. Sinon : Méthode statistique robuste (clustering + médiane pondérée)
         
         Returns:
-            (position_estimée, confiance_estimation)
+            (position_estimée, confiance_estimation) - Retourne la meilleure position
         """
         if not self.detections:
             return None, 0.0
@@ -287,6 +287,52 @@ class EnhancedDetector:
         
         # PRIORITÉ 2 : Méthode statistique robuste (fallback si GP non disponible)
         return self._estimate_position_statistical(valid_detections)
+    
+    def estimate_all_leak_positions(self, min_probability: float = 0.6, min_distance: float = 5.0) -> List[Tuple[np.ndarray, float]]:
+        """
+        Estime TOUTES les positions de fuite avec probabilité élevée de la carte de confiance GP
+        
+        Cette méthode extrait toutes les positions qui apparaissent sur la carte de confiance GP
+        avec une probabilité supérieure au seuil, en évitant les doublons proches.
+        
+        Args:
+            min_probability: Probabilité minimale pour considérer une position (0-1)
+            min_distance: Distance minimale entre deux positions détectées (m)
+            
+        Returns:
+            Liste de tuples (position, probabilité) triés par probabilité décroissante
+        """
+        if not self.detections:
+            return []
+        
+        valid_detections = [d for d in self.detections if d.is_valid]
+        if not valid_detections:
+            return []
+        
+        # PRIORITÉ 1 : Utiliser le validateur GP pour extraire toutes les positions
+        if self.use_gp_validator and self.gp_validator is not None:
+            try:
+                all_positions = self.gp_validator.get_all_leak_positions(
+                    min_probability=min_probability,
+                    min_distance=min_distance
+                )
+                if all_positions:
+                    # Convertir en numpy arrays
+                    result = []
+                    for pos, prob in all_positions:
+                        pos_array = np.array(pos)
+                        result.append((pos_array.copy(), float(prob)))
+                    return result
+            except Exception as e:
+                # En cas d'erreur, fallback
+                pass
+        
+        # PRIORITÉ 2 : Si pas de GP, utiliser la meilleure estimation statistique
+        best_pos, best_conf = self._estimate_position_statistical(valid_detections)
+        if best_pos is not None:
+            return [(best_pos.copy(), best_conf)]
+        
+        return []
     
     def _estimate_position_statistical(self, valid_detections: List[DetectionEvent]) -> Tuple[Optional[np.ndarray], float]:
         """

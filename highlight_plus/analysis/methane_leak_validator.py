@@ -185,6 +185,122 @@ class MethaneLeakValidator:
             # En cas d'erreur, retourner None
             return None, None
     
+    def get_all_leak_positions(self, min_probability: float = 0.6, min_distance: float = 5.0) -> List[Tuple[np.ndarray, float]]:
+        """
+        Extrait TOUTES les positions de fuite avec probabilité élevée de la carte de confiance GP
+        
+        Args:
+            min_probability: Probabilité minimale pour considérer une position (0-1)
+            min_distance: Distance minimale entre deux positions détectées (m)
+            
+        Returns:
+            Liste de tuples (position, probabilité) triés par probabilité décroissante
+        """
+        if len(self.X) < 2:
+            return []
+        
+        try:
+            # Créer la grille de recherche
+            x_min, x_max, y_min, y_max = self.world_bounds
+            nx, ny = self.grid_size
+            
+            # Utiliser une grille fine pour meilleure précision
+            if len(self.X) < 10:
+                nx, ny = max(nx, 150), max(ny, 150)
+            
+            xx = np.linspace(x_min, x_max, nx)
+            yy = np.linspace(y_min, y_max, ny)
+            XX, YY = np.meshgrid(xx, yy)
+            grid_points = np.c_[XX.ravel(), YY.ravel()]
+            
+            # Prédiction GP avec incertitude
+            mu, sigma = self.gp.predict(grid_points, return_std=True)
+            
+            # Calcul du score combiné (comme dans get_leak_position)
+            mu_min = mu.min()
+            mu_max = mu.max()
+            if mu_max - mu_min < 1e-6:
+                return []
+            
+            mu_normalized = (mu - mu_min) / (mu_max - mu_min + 1e-6)
+            
+            # Normaliser l'incertitude (0-1, inversé : faible incertitude = haute confiance)
+            sigma_max = sigma.max()
+            if sigma_max < 1e-6:
+                confidence = np.ones_like(sigma)
+            else:
+                confidence = 1.0 - (sigma / (sigma_max + 1e-6))
+                confidence = np.clip(confidence, 0.0, 1.0)
+            
+            # Score combiné : 70% concentration + 30% confiance
+            combined_score = 0.7 * mu_normalized + 0.3 * confidence
+            
+            # Filtrer les zones avec trop d'incertitude relative
+            relative_uncertainty = sigma / (np.abs(mu) + 1e-6)
+            uncertainty_penalty = np.where(relative_uncertainty > 0.5, 0.5, 1.0)
+            combined_score = combined_score * uncertainty_penalty
+            
+            # Identifier TOUS les candidats au-dessus du seuil
+            candidates = np.where(combined_score >= min_probability)[0]
+            
+            if len(candidates) == 0:
+                # Si aucun candidat au seuil, prendre les meilleurs (top 5)
+                top_k = min(5, len(combined_score))
+                top_indices = np.argpartition(combined_score, -top_k)[-top_k:]
+                candidates = top_indices[combined_score[top_indices] >= 0.4]  # Seuil minimum absolu
+            
+            if len(candidates) == 0:
+                return []
+            
+            # Extraire les positions et probabilités
+            candidate_positions = grid_points[candidates]
+            candidate_probs = combined_score[candidates]
+            
+            # Trier par probabilité décroissante
+            sorted_indices = np.argsort(candidate_probs)[::-1]
+            candidate_positions = candidate_positions[sorted_indices]
+            candidate_probs = candidate_probs[sorted_indices]
+            
+            # Clustering : regrouper les positions proches et garder la meilleure de chaque groupe
+            final_positions = []
+            used_indices = set()
+            
+            for i in range(len(candidate_positions)):
+                if i in used_indices:
+                    continue
+                
+                pos_i = candidate_positions[i]
+                prob_i = candidate_probs[i]
+                
+                # Trouver toutes les positions proches
+                group = [i]
+                for j in range(i + 1, len(candidate_positions)):
+                    if j in used_indices:
+                        continue
+                    pos_j = candidate_positions[j]
+                    dist = np.linalg.norm(pos_i - pos_j)
+                    if dist < min_distance:
+                        group.append(j)
+                        used_indices.add(j)
+                
+                # Prendre la position avec la plus haute probabilité dans le groupe
+                group_probs = candidate_probs[group]
+                best_in_group_idx = group[np.argmax(group_probs)]
+                best_pos = candidate_positions[best_in_group_idx]
+                best_prob = candidate_probs[best_in_group_idx]
+                
+                final_positions.append((best_pos.copy(), float(best_prob)))
+                used_indices.update(group)
+            
+            # Trier par probabilité décroissante
+            final_positions.sort(key=lambda x: x[1], reverse=True)
+            
+            return final_positions
+            
+        except Exception as e:
+            # En cas d'erreur, retourner liste vide
+            return []
+    
     def get_confidence_map(self, resolution: int = 50) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
         """
         Génère une carte de confiance (probabilité) sur la grille

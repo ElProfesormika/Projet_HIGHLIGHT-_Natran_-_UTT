@@ -1580,10 +1580,18 @@ def generate_comparative_results(leak_x, leak_y, start_x, start_y, max_steps, n_
             
             # Génération des trajectoires (dernier run pour visualisation) - EN MÉMOIRE
             st.info("Generation des trajectoires comparatives en temps reel...")
+            # Récupérer toutes les positions de fuite si disponibles
+            all_leak_positions_for_viz = None
+            if 'all_leak_positions' in locals() and all_leak_positions:
+                all_leak_positions_for_viz = [(pos[0], pos[1]) for pos in all_leak_positions]
+            elif isinstance(true_leak_pos, (list, tuple)) and len(true_leak_pos) == 2:
+                all_leak_positions_for_viz = [true_leak_pos]
+            
             traj_buffer = generate_trajectory_comparison(
                 results_naive_list[-1]['trajectory'],
                 results_highlight_list[-1]['trajectory'],
                 true_leak_pos,
+                all_leak_positions=all_leak_positions_for_viz,
                 return_buffer=True
             )
             
@@ -1591,7 +1599,8 @@ def generate_comparative_results(leak_x, leak_y, start_x, start_y, max_steps, n_
             st.session_state['simple_trajectories'] = {
                 'naive': results_naive_list[-1]['trajectory'],
                 'highlight': results_highlight_list[-1]['trajectory'],
-                'true_leak_pos': true_leak_pos
+                'true_leak_pos': true_leak_pos,
+                'all_leak_positions': all_leak_positions_for_viz
             }
             st.session_state['trajectory_buffer'] = traj_buffer
             
@@ -1723,23 +1732,37 @@ def generate_comparative_charts(metrics, return_buffer=False):
         plt.close()
         return buf
 
-def generate_trajectory_comparison(trajectory_naive, trajectory_highlight, true_leak_pos, return_buffer=True):
+def generate_trajectory_comparison(trajectory_naive, trajectory_highlight, true_leak_pos, all_leak_positions=None, return_buffer=True):
     """Génère la visualisation comparative des trajectoires en temps réel à partir des données réelles"""
     import io
+    
+    # Si all_leak_positions n'est pas fourni, utiliser true_leak_pos comme liste
+    if all_leak_positions is None:
+        if isinstance(true_leak_pos, (list, tuple)) and len(true_leak_pos) == 2:
+            all_leak_positions = [true_leak_pos]
+        else:
+            all_leak_positions = [true_leak_pos] if true_leak_pos is not None else []
     
     fig, axes = plt.subplots(1, 2, figsize=(16, 8))
     fig.suptitle('Comparaison Visuelle : Trajectoire Naïve vs HIGHLIGHT+ (Généré en Temps Réel)', 
                  fontsize=16, fontweight='bold')
     
-    # Carte de concentration (simplifiée pour visualisation)
+    # Carte de concentration (simplifiée pour visualisation) - combiner toutes les sources
     x = np.linspace(0, 100, 100)
     y = np.linspace(0, 100, 100)
     X, Y = np.meshgrid(x, y)
     
-    # Modèle gaussien simple pour la visualisation
-    dx = X - true_leak_pos[0]
-    dy = Y - true_leak_pos[1]
-    Z = np.exp(-(dx**2 + dy**2) / (2 * 10**2))
+    # Modèle gaussien combiné pour toutes les sources
+    Z = np.zeros_like(X)
+    for leak_pos in all_leak_positions:
+        if isinstance(leak_pos, (list, tuple, np.ndarray)) and len(leak_pos) >= 2:
+            dx = X - leak_pos[0]
+            dy = Y - leak_pos[1]
+            Z += np.exp(-(dx**2 + dy**2) / (2 * 10**2))
+    
+    # Normaliser Z pour la visualisation
+    if Z.max() > 0:
+        Z = Z / Z.max()
     
     # Naïve (gauche)
     ax = axes[0]
@@ -1749,7 +1772,13 @@ def generate_trajectory_comparison(trajectory_naive, trajectory_highlight, true_
         ax.plot(traj_naive[:, 0], traj_naive[:, 1], 'b-', linewidth=2, label='Trajectoire', alpha=0.7)
         ax.plot(traj_naive[0, 0], traj_naive[0, 1], 'gs', markersize=12, label='Départ')
         ax.plot(traj_naive[-1, 0], traj_naive[-1, 1], 'rs', markersize=12, label='Arrivée')
-    ax.plot(true_leak_pos[0], true_leak_pos[1], 'rx', markersize=20, linewidth=3, label='Fuite réelle')
+    
+    # Afficher toutes les positions de fuite
+    for i, leak_pos in enumerate(all_leak_positions):
+        if isinstance(leak_pos, (list, tuple, np.ndarray)) and len(leak_pos) >= 2:
+            label = 'Fuite réelle' if i == 0 else f'Fuite {i+1}'
+            ax.plot(leak_pos[0], leak_pos[1], 'rx', markersize=20, linewidth=3, label=label)
+    
     ax.set_xlim(0, 100)
     ax.set_ylim(0, 100)
     ax.set_aspect('equal')
@@ -1767,7 +1796,12 @@ def generate_trajectory_comparison(trajectory_naive, trajectory_highlight, true_
         ax.plot(traj_highlight[:, 0], traj_highlight[:, 1], 'g-', linewidth=2, label='Trajectoire', alpha=0.7)
         ax.plot(traj_highlight[0, 0], traj_highlight[0, 1], 'gs', markersize=12, label='Départ')
         ax.plot(traj_highlight[-1, 0], traj_highlight[-1, 1], 'rs', markersize=12, label='Arrivée')
-    ax.plot(true_leak_pos[0], true_leak_pos[1], 'rx', markersize=20, linewidth=3, label='Fuite réelle')
+    
+    # Afficher toutes les positions de fuite
+    for i, leak_pos in enumerate(all_leak_positions):
+        if isinstance(leak_pos, (list, tuple, np.ndarray)) and len(leak_pos) >= 2:
+            label = 'Fuite réelle' if i == 0 else f'Fuite {i+1}'
+            ax.plot(leak_pos[0], leak_pos[1], 'rx', markersize=20, linewidth=3, label=label)
     
     # Ajouter la position estimée GP si disponible dans les métriques
     # (sera ajoutée dans display_comparative_results si disponible)
@@ -2040,17 +2074,21 @@ def show_results_tab():
         st.markdown('<div class="subsection-header">📍 Fuites Détectées (Mode Multi-Fuites)</div>', unsafe_allow_html=True)
         st.success(f"✅ **{len(all_detected_leaks)} point(s) de fuite détecté(s)**")
         
-        # Créer un DataFrame pour affichage
+        # IMPORTANT : Trier les positions par probabilité GP décroissante (meilleure en premier)
+        # La probabilité GP est la confiance stockée dans detected_leaks
+        all_detected_leaks_sorted = sorted(all_detected_leaks, key=lambda x: x.get('confidence', 0.0), reverse=True)
+        
+        # Créer un DataFrame pour affichage avec positions triées
         leaks_df = pd.DataFrame([
             {
                 'ID': i+1,
                 'Position X (m)': f"{leak['position'][0]:.2f}",
                 'Position Y (m)': f"{leak['position'][1]:.2f}",
-                'Confiance': f"{leak['confidence']:.1%}",
+                'Probabilité GP': f"{leak['confidence']:.1%}",  # Probabilité GP, pas confiance de détection
                 'Étape': leak['step'],
                 'Temps (s)': f"{leak['time']:.1f}"
             }
-            for i, leak in enumerate(all_detected_leaks)
+            for i, leak in enumerate(all_detected_leaks_sorted)
         ])
         st.dataframe(leaks_df, use_container_width=True, hide_index=True)
         st.info("💡 **Note** : En mode multi-fuites, le système continue la recherche après chaque détection pour identifier toutes les fuites.")
@@ -2261,26 +2299,96 @@ def display_performance_metrics(results):
                     if len(all_detected) > 1:
                         st.info(f"**Mode multi-fuites** : {len(all_detected)} fuite(s) détectée(s) - La simulation continue pour toutes les fuites")
                 
-                est_col1, est_col2, est_col3 = st.columns(3)
-                with est_col1:
-                    st.markdown(f"**Position Estimée (GP):** ({est_pos[0]:.2f}, {est_pos[1]:.2f}) m")
-                    st.markdown(f"**Confiance GP:** {est_conf:.1%}")
-                    if est_conf >= 0.85:
-                        st.markdown('<span class="status-badge status-success">Confiance Élevée</span>', unsafe_allow_html=True)
-                    elif est_conf >= 0.6:
-                        st.markdown('<span class="status-badge status-info">Confiance Modérée</span>', unsafe_allow_html=True)
-                with est_col2:
-                    st.markdown(f"**Position Réelle:** ({true_pos_2d[0]:.2f}, {true_pos_2d[1]:.2f}) m")
-                    st.caption("(Uniquement pour validation/comparaison)")
-                with est_col3:
-                    st.markdown(f"**Erreur:** {error:.2f} m")
-                    if error <= 2.0:
-                        st.markdown('<span class="status-badge status-success">Excellente Précision</span>', unsafe_allow_html=True)
-                        st.caption("Conforme: 1.8-2.1m (analyse)")
-                    elif error <= 5.0:
-                        st.markdown('<span class="status-badge status-info">Bonne Précision</span>', unsafe_allow_html=True)
-                    elif error <= 10.0:
-                        st.markdown('<span class="status-badge status-warning">Précision Acceptable</span>', unsafe_allow_html=True)
+                # AMÉLIORATION : Afficher TOUTES les positions détectées, pas seulement la meilleure
+                all_detected = st.session_state.get('detected_leaks', [])
+                
+                # Récupérer les informations multi-fuites depuis results ou st.session_state
+                use_multi_source = results.get('use_multi_source', False)
+                all_leak_positions = results.get('all_leak_positions', [])
+                
+                # Si pas dans results, essayer de récupérer depuis st.session_state
+                if not all_leak_positions:
+                    # Récupérer depuis les positions de fuites configurées
+                    leak_positions_config = st.session_state.get('leak_positions', [])
+                    active_positions = [pos for pos in leak_positions_config if pos.get('active', False)]
+                    if len(active_positions) > 1:
+                        use_multi_source = True
+                        all_leak_positions = [(pos['x'], pos['y']) for pos in active_positions]
+                    elif len(active_positions) == 1:
+                        all_leak_positions = [(active_positions[0]['x'], active_positions[0]['y'])]
+                
+                if len(all_detected) > 1:
+                    # IMPORTANT : Trier les positions par probabilité décroissante (meilleure en premier)
+                    # La probabilité GP est la confiance stockée
+                    all_detected_sorted = sorted(all_detected, key=lambda x: x.get('confidence', 0.0), reverse=True)
+                    
+                    # Mode multi-fuites : afficher toutes les positions
+                    st.markdown("**Toutes les Positions Estimées (Carte GP):**")
+                    for i, detected in enumerate(all_detected_sorted):
+                        det_pos = detected['position']
+                        det_conf = detected.get('confidence', 0.0)  # Probabilité GP
+                        
+                        # Calculer l'erreur pour cette position
+                        if use_multi_source and all_leak_positions:
+                            min_error = float('inf')
+                            closest_real_pos = None
+                            for leak_pos in all_leak_positions:
+                                err = np.linalg.norm(np.array(det_pos) - np.array([leak_pos[0], leak_pos[1]]))
+                                if err < min_error:
+                                    min_error = err
+                                    closest_real_pos = leak_pos
+                            det_error = min_error
+                        else:
+                            det_error = np.linalg.norm(np.array(det_pos) - true_pos_2d)
+                            closest_real_pos = true_pos_2d
+                        
+                        col1, col2, col3 = st.columns(3)
+                        with col1:
+                            st.markdown(f"**Fuite {i+1}:** ({det_pos[0]:.2f}, {det_pos[1]:.2f}) m")
+                            st.markdown(f"**Probabilité GP:** {det_conf:.1%}")
+                            if det_conf >= 0.85:
+                                st.markdown('<span class="status-badge status-success">Très Élevée</span>', unsafe_allow_html=True)
+                            elif det_conf >= 0.6:
+                                st.markdown('<span class="status-badge status-info">Élevée</span>', unsafe_allow_html=True)
+                            elif det_conf >= 0.4:
+                                st.markdown('<span class="status-badge status-warning">Modérée</span>', unsafe_allow_html=True)
+                        with col2:
+                            if use_multi_source and all_leak_positions and closest_real_pos:
+                                st.markdown(f"**Source Réelle Proche:** ({closest_real_pos[0]:.2f}, {closest_real_pos[1]:.2f}) m")
+                            else:
+                                st.markdown(f"**Position Réelle:** ({true_pos_2d[0]:.2f}, {true_pos_2d[1]:.2f}) m")
+                        with col3:
+                            st.markdown(f"**Erreur:** {det_error:.2f} m")
+                            if det_error <= 2.0:
+                                st.markdown('<span class="status-badge status-success">Excellente</span>', unsafe_allow_html=True)
+                            elif det_error <= 5.0:
+                                st.markdown('<span class="status-badge status-info">Bonne</span>', unsafe_allow_html=True)
+                            elif det_error <= 10.0:
+                                st.markdown('<span class="status-badge status-warning">Acceptable</span>', unsafe_allow_html=True)
+                        if i < len(all_detected_sorted) - 1:
+                            st.markdown("---")
+                else:
+                    # Mode fuite unique : afficher la meilleure position
+                    est_col1, est_col2, est_col3 = st.columns(3)
+                    with est_col1:
+                        st.markdown(f"**Position Estimée (GP):** ({est_pos[0]:.2f}, {est_pos[1]:.2f}) m")
+                        st.markdown(f"**Confiance GP:** {est_conf:.1%}")
+                        if est_conf >= 0.85:
+                            st.markdown('<span class="status-badge status-success">Confiance Élevée</span>', unsafe_allow_html=True)
+                        elif est_conf >= 0.6:
+                            st.markdown('<span class="status-badge status-info">Confiance Modérée</span>', unsafe_allow_html=True)
+                    with est_col2:
+                        st.markdown(f"**Position Réelle:** ({true_pos_2d[0]:.2f}, {true_pos_2d[1]:.2f}) m")
+                        st.caption("(Uniquement pour validation/comparaison)")
+                    with est_col3:
+                        st.markdown(f"**Erreur:** {error:.2f} m")
+                        if error <= 2.0:
+                            st.markdown('<span class="status-badge status-success">Excellente Précision</span>', unsafe_allow_html=True)
+                            st.caption("Conforme: 1.8-2.1m (analyse)")
+                        elif error <= 5.0:
+                            st.markdown('<span class="status-badge status-info">Bonne Précision</span>', unsafe_allow_html=True)
+                        elif error <= 10.0:
+                            st.markdown('<span class="status-badge status-warning">Précision Acceptable</span>', unsafe_allow_html=True)
         
         # Détails de localisation
         if metrics.localization_accuracy:
@@ -3032,13 +3140,15 @@ def run_simulation():
         )
         
         # Initialisation du détecteur amélioré avec validateur GP
+        # AMÉLIORATION : Configuration optimisée pour le mode Teacher-Student
+        gp_threshold = 0.90 if ai_config['simulation_mode'] == "teacher_student" else 0.95  # Seuil plus bas pour Teacher-Student
         enhanced_detector = EnhancedDetector(
             true_leak_position=true_leak_pos,
             detection_threshold=sensor_config.detection_threshold,
             confidence_threshold=0.5,
             min_distance_for_detection=50.0,
             use_gp_validator=True,  # Activer le validateur GP (priorité)
-            gp_threshold_prob=0.95,  # Seuil de probabilité pour confirmation
+            gp_threshold_prob=gp_threshold,  # Seuil de probabilité adaptatif selon le mode
             world_bounds=(0, 100, 0, 100)  # Limites du monde
         )
         
@@ -3095,6 +3205,9 @@ def run_simulation():
         
         # Initialisation du suivi des fuites détectées (pour mode multi-fuites)
         st.session_state.detected_leaks = []
+        
+        # Liste des sources non détectées (pour navigation multi-fuites)
+        undetected_sources = all_leak_positions.copy() if (use_multi_source and all_leak_positions) else []
         
         # Containers pour mises à jour en temps réel
         progress_bar = st.progress(0)
@@ -3204,55 +3317,147 @@ def run_simulation():
                         else:
                             action = env.action_space.sample() * 0.4
             elif ai_config['simulation_mode'] == "teacher_student":
-                # Mode Teacher : Stratégie multi-phase avec Teacher (Expert GP)
+                # Mode Teacher : Stratégie multi-phase avec Teacher (Expert GP) + GP Validator
+                # AMÉLIORATION MAJEURE : Utilisation intensive du GP Validator pour estimation précise
                 if teacher is not None:
                     n_obs = len(teacher.observations)
                     
+                    # Récupérer l'estimation GP Validator (utilisé dans TOUTES les phases)
+                    estimated_source = None
+                    gp_confidence = 0.0
+                    if enhanced_detector.use_gp_validator and enhanced_detector.gp_validator is not None:
+                        try:
+                            est_pos, est_conf = enhanced_detector.estimate_leak_position()
+                            if est_pos is not None:
+                                estimated_source = tuple(est_pos)
+                                gp_confidence = est_conf
+                        except:
+                            pass
+                    
+                    # Calculer la distance à l'estimation GP si disponible
+                    if estimated_source is not None:
+                        dist_to_gp_est = np.linalg.norm(current_pos - np.array(estimated_source))
+                    else:
+                        dist_to_gp_est = float('inf')
+                    
+                    # PHASE 1: Navigation rapide (>25m) - AMÉLIORATION : Utiliser GP si confiance élevée
                     if distance_to_target > 25.0:
-                        # PHASE 1: Navigation rapide directe
-                        if distance_to_target > 1e-6:
-                            target_dir = vec_to_target / distance_to_target
-                            action = np.array([target_dir[0] * 1.0, target_dir[1] * 1.0, 0.0], dtype=np.float32)
-                            action = np.clip(action, -1, 1)
+                        # Si estimation GP avec confiance élevée, l'utiliser comme cible principale
+                        if estimated_source is not None and gp_confidence > 0.6:
+                            vec_to_gp = np.array(estimated_source) - current_pos
+                            dist_to_gp = np.linalg.norm(vec_to_gp)
+                            if dist_to_gp > 1e-6:
+                                gp_dir = vec_to_gp / dist_to_gp
+                                # Combiner GP (70%) + direction réelle (30%) pour robustesse
+                                target_dir = vec_to_target / distance_to_target if distance_to_target > 1e-6 else np.array([0, 0])
+                                combined = 0.7 * gp_dir + 0.3 * target_dir
+                                combined_norm = np.linalg.norm(combined)
+                                if combined_norm > 1e-6:
+                                    combined = combined / combined_norm
+                                    action = np.array([combined[0] * 1.0, combined[1] * 1.0, 0.0], dtype=np.float32)
+                                    action = np.clip(action, -1, 1)
+                                else:
+                                    action = env.action_space.sample() * 0.5
+                            else:
+                                action = env.action_space.sample() * 0.5
                         else:
-                            action = env.action_space.sample() * 0.5
+                            # Navigation classique vers la cible
+                            if distance_to_target > 1e-6:
+                                target_dir = vec_to_target / distance_to_target
+                                action = np.array([target_dir[0] * 1.0, target_dir[1] * 1.0, 0.0], dtype=np.float32)
+                                action = np.clip(action, -1, 1)
+                            else:
+                                action = env.action_space.sample() * 0.5
+                    # PHASE 2: Approche guidée (10-25m) - AMÉLIORATION : Priorité à GP Validator
                     elif distance_to_target > 10.0:
-                        # PHASE 2: Approche guidée avec Teacher
-                        # AMÉLIORATION : Utiliser l'estimation du validateur GP si disponible
-                        estimated_source = None
-                        if enhanced_detector.use_gp_validator and enhanced_detector.gp_validator is not None:
+                        # Utiliser l'estimation GP avec seuil réduit pour utilisation précoce
+                        if estimated_source is None and enhanced_detector.use_gp_validator and enhanced_detector.gp_validator is not None:
                             try:
                                 est_pos, est_conf = enhanced_detector.estimate_leak_position()
-                                if est_pos is not None and est_conf > 0.5:  # Seuil de confiance
+                                if est_pos is not None and est_conf > 0.3:  # Seuil réduit pour utilisation précoce
                                     estimated_source = tuple(est_pos)
+                                    gp_confidence = est_conf
                             except:
                                 pass
                         
-                        next_x, next_y = teacher.select_next_point(
-                            current_pos[0], 
-                            current_pos[1],
-                            gradient_x=grad_x,
-                            gradient_y=grad_y,
-                            target_position=tuple(target_position) if distance_to_target > 20.0 else None,
-                            estimated_source=estimated_source  # Utiliser l'estimation GP pour convergence
-                        )
-                        teacher_dir = np.array([next_x, next_y]) - current_pos
-                        teacher_norm = np.linalg.norm(teacher_dir)
-                        
-                        if teacher_norm > 0.1:
-                            teacher_dir = teacher_dir / teacher_norm
+                        # Utiliser l'estimation GP comme cible principale si disponible
+                        if estimated_source is not None:
+                            # Direction vers estimation GP
+                            vec_to_gp = np.array(estimated_source) - current_pos
+                            dist_to_gp = np.linalg.norm(vec_to_gp)
+                            if dist_to_gp > 1e-6:
+                                gp_dir = vec_to_gp / dist_to_gp
+                            else:
+                                gp_dir = np.array([0, 0])
+                            
+                            # Obtenir la direction du Teacher
+                            next_x, next_y = teacher.select_next_point(
+                                current_pos[0], 
+                                current_pos[1],
+                                gradient_x=grad_x,
+                                gradient_y=grad_y,
+                                target_position=tuple(target_position) if distance_to_target > 20.0 else None,
+                                estimated_source=estimated_source  # Utiliser l'estimation GP pour convergence
+                            )
+                            teacher_dir = np.array([next_x, next_y]) - current_pos
+                            teacher_norm = np.linalg.norm(teacher_dir)
+                            
+                            if teacher_norm > 0.1:
+                                teacher_dir = teacher_dir / teacher_norm
+                            else:
+                                teacher_dir = np.array([0, 0])
+                            
+                            target_dir = vec_to_target / distance_to_target if distance_to_target > 1e-6 else np.array([0, 0])
+                            grad_norm = np.sqrt(grad_x**2 + grad_y**2)
+                            
+                            # AMÉLIORATION : Poids adaptatifs selon la confiance GP
+                            if gp_confidence > 0.7:
+                                # Confiance élevée : Priorité GP (50%) + Teacher (30%) + Gradient (20%)
+                                if grad_norm > 1e-6:
+                                    grad_dir = np.array([grad_x, grad_y]) / grad_norm
+                                    combined = 0.5 * gp_dir + 0.3 * teacher_dir + 0.2 * grad_dir
+                                else:
+                                    combined = 0.6 * gp_dir + 0.4 * teacher_dir
+                            elif gp_confidence > 0.5:
+                                # Confiance moyenne : GP (35%) + Direct (30%) + Teacher (25%) + Gradient (10%)
+                                if grad_norm > 1e-6:
+                                    grad_dir = np.array([grad_x, grad_y]) / grad_norm
+                                    combined = 0.35 * gp_dir + 0.3 * target_dir + 0.25 * teacher_dir + 0.1 * grad_dir
+                                else:
+                                    combined = 0.4 * gp_dir + 0.35 * target_dir + 0.25 * teacher_dir
+                            else:
+                                # Confiance faible : Priorité Direct (45%) + Gradient (35%) + Teacher (20%)
+                                if grad_norm > 1e-6:
+                                    grad_dir = np.array([grad_x, grad_y]) / grad_norm
+                                    combined = 0.45 * target_dir + 0.35 * grad_dir + 0.2 * teacher_dir
+                                else:
+                                    combined = 0.7 * target_dir + 0.3 * teacher_dir
                         else:
-                            teacher_dir = np.array([0, 0])
-                        
-                        target_dir = vec_to_target / distance_to_target if distance_to_target > 1e-6 else np.array([0, 0])
-                        grad_norm = np.sqrt(grad_x**2 + grad_y**2)
-                        
-                        if grad_norm > 1e-6:
-                            grad_dir = np.array([grad_x, grad_y]) / grad_norm
-                            # Priorité: Direct (45%) + Gradient (35%) + Teacher (20%)
-                            combined = 0.45 * target_dir + 0.35 * grad_dir + 0.2 * teacher_dir
-                        else:
-                            combined = 0.7 * target_dir + 0.3 * teacher_dir
+                            # Pas d'estimation GP : stratégie classique
+                            next_x, next_y = teacher.select_next_point(
+                                current_pos[0], 
+                                current_pos[1],
+                                gradient_x=grad_x,
+                                gradient_y=grad_y,
+                                target_position=tuple(target_position) if distance_to_target > 20.0 else None,
+                                estimated_source=None
+                            )
+                            teacher_dir = np.array([next_x, next_y]) - current_pos
+                            teacher_norm = np.linalg.norm(teacher_dir)
+                            
+                            if teacher_norm > 0.1:
+                                teacher_dir = teacher_dir / teacher_norm
+                            else:
+                                teacher_dir = np.array([0, 0])
+                            
+                            target_dir = vec_to_target / distance_to_target if distance_to_target > 1e-6 else np.array([0, 0])
+                            grad_norm = np.sqrt(grad_x**2 + grad_y**2)
+                            
+                            if grad_norm > 1e-6:
+                                grad_dir = np.array([grad_x, grad_y]) / grad_norm
+                                combined = 0.45 * target_dir + 0.35 * grad_dir + 0.2 * teacher_dir
+                            else:
+                                combined = 0.7 * target_dir + 0.3 * teacher_dir
                         
                         combined_norm = np.linalg.norm(combined)
                         if combined_norm > 1e-6:
@@ -3261,21 +3466,29 @@ def run_simulation():
                             action = np.clip(action, -1, 1)
                         else:
                             action = env.action_space.sample() * 0.5
+                    # PHASE 3: Recherche locale (<10m) - AMÉLIORATION : Priorité maximale à GP Validator
                     else:
-                        # PHASE 3: Recherche locale avec Teacher (<10m)
-                        # AMÉLIORATION : Utiliser l'estimation GP pour convergence fine
-                        estimated_source = None
-                        if enhanced_detector.use_gp_validator and enhanced_detector.gp_validator is not None:
+                        # Utiliser l'estimation GP avec seuil très bas pour recherche locale
+                        if estimated_source is None and enhanced_detector.use_gp_validator and enhanced_detector.gp_validator is not None:
                             try:
                                 est_pos, est_conf = enhanced_detector.estimate_leak_position()
-                                if est_pos is not None and est_conf > 0.4:  # Seuil plus bas pour recherche locale
+                                if est_pos is not None and est_conf > 0.25:  # Seuil très bas pour recherche locale
                                     estimated_source = tuple(est_pos)
+                                    gp_confidence = est_conf
                             except:
                                 pass
                         
                         # Si pas d'estimation GP, utiliser la position réelle comme fallback
                         if estimated_source is None:
                             estimated_source = tuple(target_position)
+                        
+                        # Direction vers estimation GP
+                        vec_to_gp = np.array(estimated_source) - current_pos
+                        dist_to_gp = np.linalg.norm(vec_to_gp)
+                        if dist_to_gp > 1e-6:
+                            gp_dir = vec_to_gp / dist_to_gp
+                        else:
+                            gp_dir = np.array([0, 0])
                         
                         next_x, next_y = teacher.select_next_point(
                             current_pos[0], 
@@ -3296,16 +3509,35 @@ def run_simulation():
                         grad_norm = np.sqrt(grad_x**2 + grad_y**2)
                         if grad_norm > 1e-6:
                             grad_dir = np.array([grad_x, grad_y]) / grad_norm
-                            # Mouvement spirale + gradient + teacher
-                            angle_to_source = np.arctan2(vec_to_target[1], vec_to_target[0])
-                            search_angle = angle_to_source + (step * 0.3) % (2 * np.pi)
-                            circular_dir = np.array([np.cos(search_angle), np.sin(search_angle)])
-                            combined = 0.4 * grad_dir + 0.3 * circular_dir + 0.2 * teacher_dir + 0.1 * (vec_to_target / distance_to_target if distance_to_target > 1e-6 else np.array([0, 0]))
+                            
+                            # AMÉLIORATION : Poids adaptatifs selon la confiance GP (priorité maximale à GP)
+                            if gp_confidence > 0.7:
+                                # Confiance très élevée : GP (60%) + Gradient (25%) + Teacher (15%)
+                                combined = 0.6 * gp_dir + 0.25 * grad_dir + 0.15 * teacher_dir
+                            elif gp_confidence > 0.5:
+                                # Confiance élevée : GP (45%) + Gradient (30%) + Teacher (15%) + Spirale (10%)
+                                angle_to_source = np.arctan2(vec_to_target[1], vec_to_target[0])
+                                search_angle = angle_to_source + (step * 0.3) % (2 * np.pi)
+                                circular_dir = np.array([np.cos(search_angle), np.sin(search_angle)])
+                                combined = 0.45 * gp_dir + 0.3 * grad_dir + 0.15 * teacher_dir + 0.1 * circular_dir
+                            else:
+                                # Confiance faible : Gradient (40%) + Spirale (30%) + Teacher (20%) + GP (10%)
+                                angle_to_source = np.arctan2(vec_to_target[1], vec_to_target[0])
+                                search_angle = angle_to_source + (step * 0.3) % (2 * np.pi)
+                                circular_dir = np.array([np.cos(search_angle), np.sin(search_angle)])
+                                combined = 0.4 * grad_dir + 0.3 * circular_dir + 0.2 * teacher_dir + 0.1 * gp_dir
                         else:
-                            angle_to_source = np.arctan2(vec_to_target[1], vec_to_target[0])
-                            search_angle = angle_to_source + (step * 0.4) % (2 * np.pi)
-                            tangent_dir = np.array([-np.sin(search_angle), np.cos(search_angle)])
-                            combined = 0.6 * tangent_dir + 0.3 * teacher_dir + 0.1 * (vec_to_target / distance_to_target if distance_to_target > 1e-6 else np.array([0, 0]))
+                            # Sans gradient : Priorité à GP si confiance élevée
+                            if gp_confidence > 0.6:
+                                angle_to_source = np.arctan2(vec_to_gp[1], vec_to_gp[0])
+                                search_angle = angle_to_source + (step * 0.4) % (2 * np.pi)
+                                tangent_dir = np.array([-np.sin(search_angle), np.cos(search_angle)])
+                                combined = 0.5 * gp_dir + 0.3 * tangent_dir + 0.2 * teacher_dir
+                            else:
+                                angle_to_source = np.arctan2(vec_to_target[1], vec_to_target[0])
+                                search_angle = angle_to_source + (step * 0.4) % (2 * np.pi)
+                                tangent_dir = np.array([-np.sin(search_angle), np.cos(search_angle)])
+                                combined = 0.6 * tangent_dir + 0.3 * teacher_dir + 0.1 * gp_dir
                         
                         combined_norm = np.linalg.norm(combined)
                         if combined_norm > 1e-6:
@@ -3818,42 +4050,107 @@ def run_simulation():
             realtime_metrics['position'] = (env.drone_position[0], env.drone_position[1])
             realtime_metrics['concentration'] = info.get('concentration', 0.0)
             
-            # Calcul de l'erreur si position estimée disponible (mise à jour périodique)
+            # AMÉLIORATION MAJEURE : Extraire TOUTES les positions de fuite de la carte de confiance GP
             # Le validateur GP peut estimer dès 3 mesures
-            # AMÉLIORATION : Mise à jour plus fréquente et arrêt automatique si confiance élevée
-            if step % 5 == 0:  # Mise à jour très fréquente pour le GP
-                temp_estimated, temp_confidence = enhanced_detector.estimate_leak_position()
-                if temp_estimated is not None:
-                    error = np.linalg.norm(temp_estimated - np.array(true_leak_pos))
-                    realtime_metrics['error'] = error
-                    realtime_metrics['estimated_position'] = temp_estimated
-                    realtime_metrics['estimation_confidence'] = temp_confidence
+            # AMÉLIORATION : Mise à jour très fréquente pour le mode Teacher-Student (priorité GP)
+            update_frequency = 3 if ai_config['simulation_mode'] == "teacher_student" else 5  # Plus fréquent pour Teacher-Student
+            if step % update_frequency == 0:  # Mise à jour très fréquente pour le GP
+                # NOUVEAU : Extraire TOUTES les positions avec probabilité élevée de la carte GP
+                all_estimated_positions = []
+                
+                # Vérifier si la méthode existe
+                if hasattr(enhanced_detector, 'estimate_all_leak_positions'):
+                    try:
+                        all_estimated_positions = enhanced_detector.estimate_all_leak_positions(
+                            min_probability=0.5,  # Seuil de probabilité (ajustable)
+                            min_distance=5.0      # Distance minimale entre positions (m)
+                        )
+                    except Exception as e:
+                        # Fallback sur estimate_leak_position
+                        temp_pos, temp_conf = enhanced_detector.estimate_leak_position()
+                        if temp_pos is not None:
+                            all_estimated_positions = [(temp_pos, temp_conf)]
+                else:
+                    # Si la méthode n'existe pas, utiliser estimate_leak_position comme fallback
+                    temp_pos, temp_conf = enhanced_detector.estimate_leak_position()
+                    if temp_pos is not None:
+                        all_estimated_positions = [(temp_pos, temp_conf)]
+                
+                if all_estimated_positions:
+                    # Prendre la meilleure position pour les métriques en temps réel
+                    best_estimated, best_confidence = all_estimated_positions[0]
                     
-                    # NOTIFICATION de détection (mais on continue pour détecter d'autres fuites)
-                    if temp_confidence >= 0.85:
+                    # Pour multi-fuites, calculer l'erreur à la source la plus proche
+                    if use_multi_source and all_leak_positions:
+                        min_error = float('inf')
+                        for leak_pos in all_leak_positions:
+                            error = np.linalg.norm(best_estimated - np.array([leak_pos[0], leak_pos[1]]))
+                            if error < min_error:
+                                min_error = error
+                        error = min_error
+                    else:
+                        error = np.linalg.norm(best_estimated - np.array(true_leak_pos))
+                    
+                    realtime_metrics['error'] = error
+                    realtime_metrics['estimated_position'] = best_estimated
+                    realtime_metrics['estimation_confidence'] = best_confidence
+                    
+                    # AMÉLIORATION : Stocker TOUTES les positions détectées (pas seulement la meilleure)
+                    if 'detected_leaks' not in st.session_state:
+                        st.session_state.detected_leaks = []
+                    
+                    # Pour chaque position estimée, vérifier si elle est nouvelle
+                    new_detections_count = 0
+                    for est_pos, est_conf in all_estimated_positions:
                         # Vérifier si cette position n'a pas déjà été détectée
                         is_new_detection = True
-                        if 'detected_leaks' in st.session_state:
-                            for detected in st.session_state.detected_leaks:
-                                dist = np.linalg.norm(temp_estimated - np.array(detected['position']))
-                                if dist < 5.0:  # Si déjà détectée à moins de 5m
-                                    is_new_detection = False
-                                    break
+                        for detected in st.session_state.detected_leaks:
+                            dist = np.linalg.norm(est_pos - np.array(detected['position']))
+                            if dist < 5.0:  # Si déjà détectée à moins de 5m
+                                # Mettre à jour la confiance si la nouvelle est meilleure
+                                if est_conf > detected.get('confidence', 0.0):
+                                    detected['confidence'] = est_conf
+                                    detected['step'] = step
+                                    detected['time'] = step * env_config.time_step
+                                is_new_detection = False
+                                break
                         
                         if is_new_detection:
                             # Stocker la nouvelle détection
-                            if 'detected_leaks' not in st.session_state:
-                                st.session_state.detected_leaks = []
                             st.session_state.detected_leaks.append({
-                                'position': temp_estimated.tolist(),
-                                'confidence': temp_confidence,
+                                'position': est_pos.tolist(),
+                                'confidence': est_conf,
                                 'step': step,
                                 'time': step * env_config.time_step
                             })
-                            log_message(f"⚠️ POINT POTENTIEL DE FUITE DÉTECTÉ: ({temp_estimated[0]:.2f}, {temp_estimated[1]:.2f}) m | Confiance: {temp_confidence:.1%}")
-                            log_message(f"   La recherche continue pour détecter d'autres fuites...")
-                            # Afficher une notification mais continuer
-                            st.warning(f"🔍 **Point de fuite détecté** : ({temp_estimated[0]:.2f}, {temp_estimated[1]:.2f}) m | Confiance: {temp_confidence:.1%} | La recherche continue...")
+                            new_detections_count += 1
+                            
+                            # AMÉLIORATION : Retirer la source détectée de la liste des sources non détectées
+                            if use_multi_source and undetected_sources:
+                                # Trouver la source la plus proche de la position détectée
+                                min_dist = float('inf')
+                                closest_source_idx = -1
+                                for idx, source in enumerate(undetected_sources):
+                                    dist = np.linalg.norm(est_pos - np.array([source[0], source[1]]))
+                                    if dist < min_dist:
+                                        min_dist = dist
+                                        closest_source_idx = idx
+                                
+                                # Si la source détectée est à moins de 10m d'une source réelle, la retirer
+                                if closest_source_idx >= 0 and min_dist < 10.0:
+                                    removed_source = undetected_sources.pop(closest_source_idx)
+                                    log_message(f"   Source ({removed_source[0]:.1f}, {removed_source[1]:.1f}) retirée de la liste des cibles. {len(undetected_sources)} source(s) restante(s).")
+                            
+                            log_message(f"⚠️ POINT DE FUITE DÉTECTÉ: ({est_pos[0]:.2f}, {est_pos[1]:.2f}) m | Confiance: {est_conf:.1%}")
+                    
+                    if new_detections_count > 0:
+                        log_message(f"   {new_detections_count} nouvelle(s) position(s) détectée(s) sur la carte GP. Total: {len(st.session_state.detected_leaks)} position(s).")
+                        log_message(f"   La recherche continue pour détecter d'autres fuites...")
+                        # Afficher une notification mais continuer
+                        if new_detections_count == 1:
+                            st.warning(f"🔍 **Point de fuite détecté** : ({all_estimated_positions[0][0][0]:.2f}, {all_estimated_positions[0][0][1]:.2f}) m | Confiance: {all_estimated_positions[0][1]:.1%} | La recherche continue...")
+                        else:
+                            st.warning(f"🔍 **{new_detections_count} point(s) de fuite détecté(s)** sur la carte GP | Total: {len(st.session_state.detected_leaks)} position(s) | La recherche continue...")
             
             # Progression
             progress = (step + 1) / ai_config['max_steps'] * 100
@@ -3932,8 +4229,71 @@ def run_simulation():
                                             row=1, col=1
                                         )
                                         
-                                        # Position estimée de la fuite - VISIBILITÉ MAXIMALE
-                                        if realtime_metrics.get('estimated_position') is not None:
+                                        # AMÉLIORATION : Afficher TOUTES les positions de fuite détectées sur la carte GP
+                                        # Récupérer toutes les positions détectées
+                                        all_detected = st.session_state.get('detected_leaks', [])
+                                        
+                                        if all_detected:
+                                            # Extraire les positions et confiances
+                                            detected_x = [d['position'][0] for d in all_detected]
+                                            detected_y = [d['position'][1] for d in all_detected]
+                                            detected_conf = [d.get('confidence', 0.0) for d in all_detected]
+                                            
+                                            # Afficher toutes les positions avec des marqueurs
+                                            for i, (x, y, conf) in enumerate(zip(detected_x, detected_y, detected_conf)):
+                                                # Taille du marqueur proportionnelle à la confiance
+                                                marker_size = 15 + (conf * 15)  # Entre 15 et 30
+                                                
+                                                # Couleur selon la confiance (rouge vif si haute, orange si moyenne)
+                                                if conf >= 0.7:
+                                                    marker_color = 'red'
+                                                elif conf >= 0.5:
+                                                    marker_color = 'orange'
+                                                else:
+                                                    marker_color = 'yellow'
+                                                
+                                                # Marqueur principal : étoile pour toutes les positions
+                                                fig.add_trace(
+                                                    go.Scatter(
+                                                        x=[x],
+                                                        y=[y],
+                                                        mode='markers+text',
+                                                        marker=dict(
+                                                            color=marker_color,
+                                                            size=marker_size,
+                                                            symbol='star',
+                                                            line=dict(color='white', width=2),
+                                                            opacity=1.0
+                                                        ),
+                                                        text=[f"Fuite {i+1}<br>({x:.1f}, {y:.1f})<br>Conf: {conf:.1%}"],
+                                                        textposition='top center',
+                                                        textfont=dict(size=10, color=marker_color, family='Arial Black'),
+                                                        name=f'Position Estimée {i+1}' if i == 0 else '',
+                                                        showlegend=(i == 0),  # Afficher la légende seulement pour la première
+                                                        hovertemplate=f'<b>Position Estimée {i+1} (GP)</b><br>Position: ({x:.2f}, {y:.2f}) m<br>Confiance: {conf:.1%}<extra></extra>'
+                                                    ),
+                                                    row=1, col=1
+                                                )
+                                                
+                                                # Cercle de confiance autour de chaque position
+                                                theta = np.linspace(0, 2*np.pi, 50)
+                                                confidence_radius = 2.0 * conf  # Rayon proportionnel à la confiance
+                                                circle_x = x + confidence_radius * np.cos(theta)
+                                                circle_y = y + confidence_radius * np.sin(theta)
+                                                fig.add_trace(
+                                                    go.Scatter(
+                                                        x=circle_x,
+                                                        y=circle_y,
+                                                        mode='lines',
+                                                        line=dict(color=marker_color, width=1, dash='dash'),
+                                                        name='Zone de Confiance' if i == 0 else '',
+                                                        showlegend=False,
+                                                        hoverinfo='skip'
+                                                    ),
+                                                    row=1, col=1
+                                                )
+                                        elif realtime_metrics.get('estimated_position') is not None:
+                                            # Fallback : afficher la meilleure position si pas de liste complète
                                             est_pos = realtime_metrics['estimated_position']
                                             est_conf = realtime_metrics.get('estimation_confidence', 0.0)
                                             
@@ -4010,18 +4370,32 @@ def run_simulation():
                                     row=1, col=2
                                 )
                                 
-                                # Position réelle de la fuite
-                                fig.add_trace(
-                                    go.Scatter(
-                                        x=[plume_config.leak_x],
-                                        y=[plume_config.leak_y],
-                                        mode='markers',
-                                        marker=dict(color='yellow', size=15, symbol='x', line=dict(width=2)),
-                                        name='Fuite Réelle',
-                                        showlegend=False
-                                    ),
-                                    row=1, col=2
-                                )
+                                # Positions réelles de fuite (toutes les sources)
+                                if use_multi_source and all_leak_positions:
+                                    for i, leak_pos in enumerate(all_leak_positions):
+                                        fig.add_trace(
+                                            go.Scatter(
+                                                x=[leak_pos[0]],
+                                                y=[leak_pos[1]],
+                                                mode='markers',
+                                                marker=dict(color='red', size=15, symbol='x', line=dict(width=2)),
+                                                name=f'Fuite {i+1}' if i > 0 else 'Fuite Réelle',
+                                                showlegend=False
+                                            ),
+                                            row=1, col=2
+                                        )
+                                else:
+                                    fig.add_trace(
+                                        go.Scatter(
+                                            x=[plume_config.leak_x],
+                                            y=[plume_config.leak_y],
+                                            mode='markers',
+                                            marker=dict(color='yellow', size=15, symbol='x', line=dict(width=2)),
+                                            name='Fuite Réelle',
+                                            showlegend=False
+                                        ),
+                                        row=1, col=2
+                                    )
                             
                             # Configuration des axes
                             fig.update_xaxes(title_text="X (m)", row=1, col=1, range=[0, 100])
@@ -4060,8 +4434,44 @@ def run_simulation():
         # Statistiques du détecteur amélioré
         detector_stats = enhanced_detector.get_statistics()
         
-        # PRIORITÉ : Utiliser la position estimée du GP comme résultat final
-        estimated_pos, estimation_confidence = enhanced_detector.estimate_leak_position()
+        # AMÉLIORATION MAJEURE : Extraire TOUTES les positions de fuite de la carte de confiance GP
+        # Utiliser estimate_all_leak_positions() pour obtenir toutes les positions détectées
+        all_estimated_positions = []
+        
+        # Vérifier si la méthode existe
+        if hasattr(enhanced_detector, 'estimate_all_leak_positions'):
+            try:
+                all_estimated_positions = enhanced_detector.estimate_all_leak_positions(
+                    min_probability=0.5,  # Seuil de probabilité
+                    min_distance=5.0      # Distance minimale entre positions (m)
+                )
+            except Exception as e:
+                log_message(f"ERREUR lors de l'appel à estimate_all_leak_positions: {e}")
+                # Fallback sur estimate_leak_position
+                temp_pos, temp_conf = enhanced_detector.estimate_leak_position()
+                if temp_pos is not None:
+                    all_estimated_positions = [(temp_pos, temp_conf)]
+        else:
+            # Si la méthode n'existe pas, utiliser estimate_leak_position comme fallback
+            log_message("ATTENTION: estimate_all_leak_positions non disponible, utilisation de estimate_leak_position")
+            temp_pos, temp_conf = enhanced_detector.estimate_leak_position()
+            if temp_pos is not None:
+                all_estimated_positions = [(temp_pos, temp_conf)]
+        
+        # IMPORTANT : La meilleure position (probabilité la plus élevée) est utilisée pour les statistiques
+        # La liste est déjà triée par probabilité décroissante (première = meilleure)
+        estimated_pos = None
+        estimation_confidence = 0.0
+        if all_estimated_positions:
+            # Prendre la première position (probabilité la plus élevée) pour les métriques
+            estimated_pos, estimation_confidence = all_estimated_positions[0]
+            log_message(f"✅ {len(all_estimated_positions)} position(s) détectée(s) sur la carte GP. Meilleure: ({estimated_pos[0]:.2f}, {estimated_pos[1]:.2f}) m, confiance: {estimation_confidence:.1%}")
+        else:
+            # Fallback : utiliser estimate_leak_position() pour la meilleure position
+            estimated_pos, estimation_confidence = enhanced_detector.estimate_leak_position()
+            if estimated_pos is not None:
+                all_estimated_positions = [(estimated_pos, estimation_confidence)]
+                log_message(f"✅ Position détectée (fallback): ({estimated_pos[0]:.2f}, {estimated_pos[1]:.2f}) m, confiance: {estimation_confidence:.1%}")
         
         # Calcul des métriques de performance (avant de mettre à jour avec GP)
         performance_metrics = validator.compute_metrics()
@@ -4075,9 +4485,74 @@ def run_simulation():
                 estimation_confidence = 0.5  # Confiance par défaut
                 log_message("ATTENTION: Utilisation de la position detectee du validateur (pas d'estimation GP)")
         
-        # AMÉLIORATION : Toujours utiliser la position estimée du GP comme résultat final
-        if estimated_pos is not None:
-            # Mettre à jour la précision de localisation avec l'estimation GP
+        # AMÉLIORATION : Stocker TOUTES les positions détectées dans st.session_state si pas déjà fait
+        # IMPORTANT : Les positions sont déjà triées par probabilité décroissante dans all_estimated_positions
+        # (première = meilleure probabilité GP)
+        if not st.session_state.get('detected_leaks') or len(st.session_state.get('detected_leaks', [])) == 0:
+            # Si aucune position n'a été stockée pendant la simulation, utiliser les positions estimées
+            if all_estimated_positions:
+                st.session_state.detected_leaks = []
+                # Les positions sont déjà triées par probabilité décroissante depuis estimate_all_leak_positions
+                for est_pos, est_conf in all_estimated_positions:
+                    st.session_state.detected_leaks.append({
+                        'position': est_pos.tolist() if isinstance(est_pos, np.ndarray) else list(est_pos),
+                        'confidence': est_conf,  # Probabilité GP (pas confiance de détection)
+                        'step': step + 1,
+                        'time': (step + 1) * env_config.time_step
+                    })
+                # S'assurer que la liste est triée par probabilité décroissante
+                st.session_state.detected_leaks.sort(key=lambda x: x.get('confidence', 0.0), reverse=True)
+                log_message(f"📊 {len(all_estimated_positions)} position(s) stockée(s) dans detected_leaks (triées par probabilité GP)")
+        
+        # IMPORTANT : La meilleure position (première dans la liste, probabilité la plus élevée) 
+        # est utilisée pour toutes les métriques et statistiques
+        if all_estimated_positions:
+            log_message(f"📈 Position utilisée pour statistiques: ({estimated_pos[0]:.2f}, {estimated_pos[1]:.2f}) m (confiance: {estimation_confidence:.1%})")
+        
+        # AMÉLIORATION : Calculer les métriques pour toutes les positions détectées (multi-fuites)
+        all_detected_leaks = st.session_state.get('detected_leaks', [])
+        
+        # IMPORTANT : Trier les positions par probabilité GP décroissante (meilleure en premier)
+        # La probabilité GP est la confiance stockée dans detected_leaks
+        all_detected_leaks_sorted = sorted(all_detected_leaks, key=lambda x: x.get('confidence', 0.0), reverse=True)
+        
+        # Calculer les erreurs pour toutes les positions détectées
+        if use_multi_source and all_leak_positions and all_detected_leaks_sorted:
+            # Pour chaque position détectée, trouver la source réelle la plus proche
+            errors_per_detection = []
+            for detected in all_detected_leaks:
+                detected_pos = np.array(detected['position'])
+                min_error = float('inf')
+                closest_real_pos = None
+                for real_pos in all_leak_positions:
+                    error = np.linalg.norm(detected_pos - np.array([real_pos[0], real_pos[1]]))
+                    if error < min_error:
+                        min_error = error
+                        closest_real_pos = real_pos
+                errors_per_detection.append({
+                    'detected': detected_pos,
+                    'real': closest_real_pos,
+                    'error': min_error,
+                    'confidence': detected.get('confidence', 0.0)
+                })
+            
+            # Calculer la moyenne des erreurs
+            if errors_per_detection:
+                avg_error = np.mean([e['error'] for e in errors_per_detection])
+                max_error = np.max([e['error'] for e in errors_per_detection])
+                min_error = np.min([e['error'] for e in errors_per_detection])
+                
+                # Mettre à jour les métriques avec la moyenne
+                if performance_metrics.localization_accuracy:
+                    performance_metrics.localization_accuracy.error_distance = avg_error
+                    performance_metrics.localization_accuracy.detected_position = estimated_pos if estimated_pos is not None else errors_per_detection[0]['detected']
+                    # Ajouter des informations supplémentaires
+                    if hasattr(performance_metrics.localization_accuracy, 'max_error'):
+                        performance_metrics.localization_accuracy.max_error = max_error
+                        performance_metrics.localization_accuracy.min_error = min_error
+                        performance_metrics.localization_accuracy.n_detections = len(errors_per_detection)
+        elif estimated_pos is not None:
+            # Cas simple : une seule position
             error = np.linalg.norm(estimated_pos - np.array(true_leak_pos))
             if performance_metrics.localization_accuracy:
                 performance_metrics.localization_accuracy.error_distance = error
@@ -4150,7 +4625,10 @@ def run_simulation():
                 'position': d.position.tolist(),
                 'confidence': d.confidence,
                 'distance': d.distance_to_source
-            } for d in enhanced_detector.detections if d.is_valid]
+            } for d in enhanced_detector.detections if d.is_valid],
+            # Informations multi-fuites
+            'use_multi_source': use_multi_source if 'use_multi_source' in locals() else False,
+            'all_leak_positions': all_leak_positions if 'all_leak_positions' in locals() else []
         }
         
         log_message("Simulation terminée avec succès")
@@ -4572,28 +5050,57 @@ def run_position_tests(iterations, steps, mode):
                             )
                             
                             # Si une fuite est détectée, l'ajouter à la liste
+                            # AMÉLIORATION : Extraire TOUTES les positions de fuite de la carte GP
                             if detection_event and detection_event.is_valid:
-                                temp_estimated, temp_confidence = enhanced_detector.estimate_leak_position()
-                                if temp_estimated is not None:
-                                    # Vérifier si cette fuite n'est pas déjà détectée (dans un rayon de 5m)
-                                    is_duplicate = False
-                                    for detected in all_detected_leaks_per_position:
-                                        dist = np.linalg.norm(temp_estimated - np.array(detected['position']))
-                                        if dist < 5.0:
-                                            is_duplicate = True
-                                            # Mettre à jour la confiance si plus élevée
-                                            if temp_confidence > detected['confidence']:
-                                                detected['confidence'] = temp_confidence
-                                                detected['position'] = temp_estimated.tolist()
-                                            break
-                                    
-                                    if not is_duplicate:
-                                        all_detected_leaks_per_position.append({
-                                            'position': temp_estimated.tolist(),
-                                            'confidence': temp_confidence,
-                                            'step': step,
-                                            'time': timestamp
-                                        })
+                                # Utiliser estimate_all_leak_positions pour obtenir toutes les positions
+                                all_temp_estimated = []
+                                
+                                # Vérifier si la méthode existe
+                                if hasattr(enhanced_detector, 'estimate_all_leak_positions'):
+                                    try:
+                                        all_temp_estimated = enhanced_detector.estimate_all_leak_positions(
+                                            min_probability=0.5, 
+                                            min_distance=5.0
+                                        )
+                                    except Exception as e:
+                                        # Fallback sur estimate_leak_position
+                                        temp_estimated, temp_confidence = enhanced_detector.estimate_leak_position()
+                                        if temp_estimated is not None:
+                                            all_temp_estimated = [(temp_estimated, temp_confidence)]
+                                else:
+                                    # Si la méthode n'existe pas, utiliser estimate_leak_position comme fallback
+                                    temp_estimated, temp_confidence = enhanced_detector.estimate_leak_position()
+                                    if temp_estimated is not None:
+                                        all_temp_estimated = [(temp_estimated, temp_confidence)]
+                                
+                                # Si pas de positions multiples, utiliser la meilleure
+                                if not all_temp_estimated:
+                                    temp_estimated, temp_confidence = enhanced_detector.estimate_leak_position()
+                                    if temp_estimated is not None:
+                                        all_temp_estimated = [(temp_estimated, temp_confidence)]
+                                
+                                # Ajouter toutes les positions détectées
+                                for temp_estimated, temp_confidence in all_temp_estimated:
+                                    if temp_estimated is not None:
+                                        # Vérifier si cette fuite n'est pas déjà détectée (dans un rayon de 5m)
+                                        is_duplicate = False
+                                        for detected in all_detected_leaks_per_position:
+                                            dist = np.linalg.norm(temp_estimated - np.array(detected['position']))
+                                            if dist < 5.0:
+                                                is_duplicate = True
+                                                # Mettre à jour la confiance si plus élevée
+                                                if temp_confidence > detected['confidence']:
+                                                    detected['confidence'] = temp_confidence
+                                                    detected['position'] = temp_estimated.tolist()
+                                                break
+                                        
+                                        if not is_duplicate:
+                                            all_detected_leaks_per_position.append({
+                                                'position': temp_estimated.tolist(),
+                                                'confidence': temp_confidence,
+                                                'step': step,
+                                                'time': timestamp
+                                            })
                     
                     if terminated or truncated:
                         break
@@ -4602,8 +5109,33 @@ def run_position_tests(iterations, steps, mode):
                 validator.total_steps = step + 1
                 metrics = validator.compute_metrics()
                 
-                # Estimation GP de la position
-                estimated_pos, estimation_confidence = enhanced_detector.estimate_leak_position()
+                # AMÉLIORATION : Extraire TOUTES les positions de fuite de la carte GP
+                all_estimated = []
+                
+                # Vérifier si la méthode existe
+                if hasattr(enhanced_detector, 'estimate_all_leak_positions'):
+                    try:
+                        all_estimated = enhanced_detector.estimate_all_leak_positions(
+                            min_probability=0.5, 
+                            min_distance=5.0
+                        )
+                    except Exception as e:
+                        # Fallback sur estimate_leak_position
+                        temp_pos, temp_conf = enhanced_detector.estimate_leak_position()
+                        if temp_pos is not None:
+                            all_estimated = [(temp_pos, temp_conf)]
+                else:
+                    # Si la méthode n'existe pas, utiliser estimate_leak_position comme fallback
+                    temp_pos, temp_conf = enhanced_detector.estimate_leak_position()
+                    if temp_pos is not None:
+                        all_estimated = [(temp_pos, temp_conf)]
+                
+                # IMPORTANT : La meilleure position (probabilité la plus élevée) est utilisée pour les métriques
+                # La liste est déjà triée par probabilité décroissante (première = meilleure)
+                if all_estimated:
+                    estimated_pos, estimation_confidence = all_estimated[0]  # Meilleure position pour statistiques
+                else:
+                    estimated_pos, estimation_confidence = enhanced_detector.estimate_leak_position()
                 gp_used = enhanced_detector.use_gp_validator
                 
                 # Statistiques du détecteur
