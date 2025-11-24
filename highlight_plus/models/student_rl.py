@@ -166,26 +166,51 @@ class StudentRL:
         # Initialisation du réseau cible
         self.update_target_network()
     
-    def select_action(self, state: np.ndarray, training: bool = True) -> np.ndarray:
+    def select_action(self, state: np.ndarray, training: bool = True, 
+                     teacher_guidance: Optional[np.ndarray] = None) -> np.ndarray:
         """
         Sélectionne une action selon la politique actuelle
         
         Args:
             state: État actuel
             training: Mode d'entraînement (exploration vs exploitation)
+            teacher_guidance: Action suggérée par le Teacher (optionnel, pour guidance)
             
         Returns:
             Action sélectionnée
         """
         if training and random.random() < self.epsilon:
-            # Exploration aléatoire guidée (moins aléatoire, plus directionnelle)
-            action = np.random.uniform(-0.5, 0.5, self.action_dim)  # Réduire l'amplitude
+            # Exploration guidée par le Teacher si disponible
+            if teacher_guidance is not None and self.teacher is not None:
+                # Exploration autour de la direction du Teacher (plus intelligente)
+                # S'assurer que teacher_guidance a la bonne shape (3,)
+                if len(teacher_guidance) == 2:
+                    teacher_guidance_3d = np.append(teacher_guidance, 0.0)  # Ajouter z=0
+                else:
+                    teacher_guidance_3d = teacher_guidance[:self.action_dim]
+                noise = np.random.uniform(-0.3, 0.3, self.action_dim)
+                action = teacher_guidance_3d + noise
+                action = np.clip(action, -1, 1)
+            else:
+                # Exploration aléatoire guidée (moins aléatoire, plus directionnelle)
+                action = np.random.uniform(-0.5, 0.5, self.action_dim)  # Réduire l'amplitude
         else:
             # Exploitation de la politique
             with torch.no_grad():
                 state_tensor = torch.FloatTensor(state).unsqueeze(0)
                 action_tensor = self.policy_net(state_tensor)
                 action = action_tensor.squeeze(0).numpy()
+                
+                # Si le Student n'est pas encore bien entraîné, mélanger avec guidance Teacher
+                if teacher_guidance is not None and len(self.loss_history) < 50:
+                    # Au début, favoriser légèrement le Teacher
+                    # S'assurer que teacher_guidance a la bonne shape (3,)
+                    if len(teacher_guidance) == 2:
+                        teacher_guidance_3d = np.append(teacher_guidance, 0.0)  # Ajouter z=0
+                    else:
+                        teacher_guidance_3d = teacher_guidance[:self.action_dim]
+                    action = 0.7 * action + 0.3 * teacher_guidance_3d
+                    action = np.clip(action, -1, 1)
         
         return action.astype(np.float32)
     

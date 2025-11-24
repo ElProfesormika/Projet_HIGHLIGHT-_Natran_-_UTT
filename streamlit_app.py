@@ -2597,15 +2597,21 @@ def run_simulation():
     # Configuration - Utiliser les positions de fuites configurées si disponibles
     base_plume_config = st.session_state.plume_config.copy()
     
-    # Si des positions de fuites sont configurées et actives, utiliser la première
+    # Gestion des positions de fuites multiples
+    all_leak_positions = []
     if st.session_state.leak_positions:
         active_positions = [pos for pos in st.session_state.leak_positions if pos.get('active', True)]
         if active_positions:
+            # Stocker toutes les positions pour référence
+            all_leak_positions = [(pos['x'], pos['y'], pos.get('intensity', 0.3)) for pos in active_positions]
+            # Utiliser la première pour la simulation initiale (le système détectera les autres)
             first_position = active_positions[0]
             base_plume_config['leak_x'] = first_position['x']
             base_plume_config['leak_y'] = first_position['y']
             base_plume_config['leak_intensity'] = first_position.get('intensity', base_plume_config.get('leak_intensity', 0.3))
-            log_message(f"Utilisation position configuree: ({first_position['x']:.1f}, {first_position['y']:.1f})")
+            log_message(f"Mode multi-fuites: {len(active_positions)} position(s) configurée(s)")
+            log_message(f"Position initiale: ({first_position['x']:.1f}, {first_position['y']:.1f})")
+            log_message(f"Le système détectera toutes les fuites pendant la simulation")
     
     plume_config = PlumeConfig(**base_plume_config)
     sensor_config = TDLASConfig(**st.session_state.sensor_config)
@@ -2682,10 +2688,11 @@ def run_simulation():
             
             if ai_config['simulation_mode'] == "full_learning":
                 student_config = StudentConfig(
-                    learning_rate=ai_config.get('student_learning_rate', 1e-3),
-                    lambda_kl=ai_config.get('student_lambda_kl', 0.2),
+                    learning_rate=ai_config.get('student_learning_rate', 2.5e-4),
+                    lambda_kl=ai_config.get('student_lambda_kl', 0.15),
                     batch_size=ai_config.get('batch_size', 128),
-                    buffer_size=ai_config.get('buffer_size', 20000)
+                    buffer_size=ai_config.get('buffer_size', 20000),
+                    learning_starts=200  # Réduit pour apprentissage plus rapide (au lieu de 1000)
                 )
                 student = StudentRL(
                     state_dim=16,
@@ -2693,7 +2700,7 @@ def run_simulation():
                     config=student_config,
                     teacher=teacher
                 )
-                log_message("Student (Apprenti) initialisé avec distillation")
+                log_message("Student (Apprenti) initialisé avec distillation - Mode Performance Optimisé")
         
         # Variables de performance
         total_reward = 0
@@ -2701,6 +2708,9 @@ def run_simulation():
         energy_consumed = 0
         max_concentration = 0
         trajectory = []
+        
+        # Initialisation du suivi des fuites détectées (pour mode multi-fuites)
+        st.session_state.detected_leaks = []
         
         # Containers pour mises à jour en temps réel
         progress_bar = st.progress(0)
@@ -2913,27 +2923,81 @@ def run_simulation():
                 else:
                     action = env.action_space.sample()
             else:  # full_learning
-                # MODE FULL LEARNING OPTIMISÉ : Student + Teacher + Stratégie multi-phase avec GP
-                # AMÉLIORATION : Récupérer l'estimation GP pour toutes les phases
+                # MODE FULL LEARNING OPTIMISÉ : Student + Teacher + Stratégie adaptative multi-phase avec GP
+                # AMÉLIORATION : Stratégie adaptative qui favorise Teacher au début, puis augmente Student progressivement
                 estimated_source = None
                 if enhanced_detector.use_gp_validator and enhanced_detector.gp_validator is not None:
                     try:
                         est_pos, est_conf = enhanced_detector.estimate_leak_position()
                         if est_pos is not None and est_conf > 0.3:  # Seuil bas pour utilisation précoce
-                            estimated_source = est_pos
+                            # S'assurer que estimated_source est toujours de shape (2,)
+                            if isinstance(est_pos, (list, tuple, np.ndarray)):
+                                estimated_source = np.array(est_pos)[:2]  # Prendre seulement x, y
+                            else:
+                                estimated_source = None
                     except:
                         pass
                 
                 if student is not None:
-                    # Action du Student
-                    action_student = student.select_action(obs, training=True)
+                    # Calcul de la confiance du Student (basée sur sa perte d'apprentissage)
+                    student_confidence = 0.0
+                    if len(student.loss_history) > 10:
+                        # Confiance basée sur la perte moyenne récente (plus la perte est faible, plus la confiance est élevée)
+                        recent_losses = student.loss_history[-10:]
+                        avg_loss = np.mean(recent_losses)
+                        # Normaliser la perte (0.0 = excellente, 1.0 = mauvaise)
+                        # On considère qu'une perte < 0.1 est bonne
+                        student_confidence = max(0.0, min(1.0, 1.0 - (avg_loss / 0.5)))
+                    else:
+                        # Au début, confiance très faible (favoriser Teacher)
+                        student_confidence = 0.1
                     
-                    # Amélioration multi-phase avec guidance GP + Teacher
+                    # Poids adaptatifs : Teacher dominant au début, Student augmente avec la confiance
+                    # Au début (confiance faible) : Teacher 80%, Student 20%
+                    # À la fin (confiance élevée) : Teacher 30%, Student 70%
+                    teacher_weight = 0.8 - (0.5 * student_confidence)  # De 0.8 à 0.3
+                    student_weight = 0.2 + (0.5 * student_confidence)  # De 0.2 à 0.7
+                    
+                    # Calculer la guidance du Teacher pour le Student
+                    teacher_guidance = None
+                    if teacher is not None:
+                        try:
+                            next_x, next_y = teacher.select_next_point(
+                                current_pos[0],
+                                current_pos[1],
+                                gradient_x=grad_x,
+                                gradient_y=grad_y,
+                                target_position=tuple(target_position) if distance_to_target > 20.0 else None,
+                                estimated_source=tuple(estimated_source) if estimated_source is not None else None
+                            )
+                            teacher_vec = np.array([next_x, next_y]) - current_pos[:2]  # Utiliser seulement x, y
+                            teacher_norm = np.linalg.norm(teacher_vec)
+                            if teacher_norm > 0.1:
+                                teacher_guidance = teacher_vec / teacher_norm
+                            else:
+                                # Fallback sur gradient
+                                grad_norm = np.linalg.norm([grad_x, grad_y])
+                                if grad_norm > 1e-6:
+                                    teacher_guidance = np.array([grad_x, grad_y]) / grad_norm  # Shape (2,)
+                        except:
+                            pass
+                    
+                    # Action du Student (avec guidance Teacher si disponible)
+                    action_student = student.select_action(obs, training=True, teacher_guidance=teacher_guidance)
+                    
+                    # Amélioration multi-phase avec guidance GP + Teacher (stratégie adaptative)
                     if distance_to_target > 25.0:
                         # PHASE 1: Navigation rapide - combiner Student + direction (GP ou réelle)
                         # Utiliser l'estimation GP si disponible, sinon position réelle
-                        nav_target = estimated_source if estimated_source is not None else target_position
-                        vec_to_nav = nav_target - current_pos
+                        if estimated_source is not None:
+                            # S'assurer que estimated_source est de shape (2,)
+                            if isinstance(estimated_source, (list, tuple, np.ndarray)):
+                                nav_target = np.array(estimated_source)[:2]  # Prendre seulement x, y
+                            else:
+                                nav_target = target_position
+                        else:
+                            nav_target = target_position
+                        vec_to_nav = nav_target - current_pos  # current_pos est déjà de shape (2,)
                         dist_to_nav = np.linalg.norm(vec_to_nav)
                         
                         if dist_to_nav > 1e-6:
@@ -2941,10 +3005,36 @@ def run_simulation():
                         else:
                             nav_dir = vec_to_target / distance_to_target if distance_to_target > 1e-6 else np.array([0, 0])
                         
-                        # Student (60%) + Direction GP/Réelle (40%)
-                        action = 0.6 * action_student[:2] + 0.4 * nav_dir
-                        action = np.append(action, 0.0)
-                        action = np.clip(action, -1, 1)
+                        # Direction Teacher (basée sur GP ou réelle)
+                        teacher_dir_nav = np.array([0.0, 0.0])
+                        if teacher is not None:
+                            try:
+                                next_x, next_y = teacher.select_next_point(
+                                    current_pos[0],
+                                    current_pos[1],
+                                    gradient_x=grad_x,
+                                    gradient_y=grad_y,
+                                    target_position=tuple(nav_target),
+                                    estimated_source=tuple(estimated_source) if estimated_source is not None else None
+                                )
+                                teacher_vec = np.array([next_x, next_y]) - current_pos[:2]  # Utiliser seulement x, y
+                                teacher_norm = np.linalg.norm(teacher_vec)
+                                if teacher_norm > 0.1:
+                                    teacher_dir_nav = teacher_vec / teacher_norm
+                            except:
+                                teacher_dir_nav = nav_dir.copy() if nav_dir is not None else np.array([0.0, 0.0])
+                        else:
+                            teacher_dir_nav = nav_dir.copy() if nav_dir is not None else np.array([0.0, 0.0])
+                        
+                        # Mélange adaptatif : Teacher (selon confiance) + Student (selon confiance) + Direction (fixe)
+                        combined = teacher_weight * teacher_dir_nav + student_weight * action_student[:2] + 0.2 * nav_dir
+                        combined_norm = np.linalg.norm(combined)
+                        if combined_norm > 1e-6:
+                            combined = combined / combined_norm
+                            action = np.append(combined, 0.0)
+                            action = np.clip(action, -1, 1)
+                        else:
+                            action = np.clip(action_student, -1, 1)
                     elif distance_to_target > 10.0:
                         # PHASE 2: Approche guidée - Student + gradient + Teacher + GP
                         # Utiliser Teacher avec estimation GP pour convergence guidée
@@ -2957,9 +3047,9 @@ def run_simulation():
                                     gradient_x=grad_x,
                                     gradient_y=grad_y,
                                     target_position=tuple(target_position) if distance_to_target > 20.0 else None,
-                                    estimated_source=tuple(estimated_source) if estimated_source is not None else None
+                                    estimated_source=tuple(estimated_source) if estimated_source is not None and len(estimated_source) == 2 else None
                                 )
-                                teacher_vec = np.array([next_x, next_y]) - current_pos
+                                teacher_vec = np.array([next_x, next_y]) - current_pos[:2]  # Utiliser seulement x, y
                                 teacher_norm = np.linalg.norm(teacher_vec)
                                 if teacher_norm > 0.1:
                                     teacher_dir = teacher_vec / teacher_norm
@@ -2971,13 +3061,21 @@ def run_simulation():
                             grad_dir = np.array([grad_x, grad_y]) / grad_norm
                             
                             # Direction vers centre estimé (GP ou réel)
-                            search_center = estimated_source if estimated_source is not None else target_position
-                            vec_to_center = search_center - current_pos
+                            if estimated_source is not None:
+                                # S'assurer que estimated_source est de shape (2,)
+                                if isinstance(estimated_source, (list, tuple, np.ndarray)):
+                                    search_center = np.array(estimated_source)[:2]  # Prendre seulement x, y
+                                else:
+                                    search_center = target_position
+                            else:
+                                search_center = target_position
+                            vec_to_center = search_center - current_pos  # current_pos est déjà de shape (2,)
                             dist_to_center = np.linalg.norm(vec_to_center)
                             center_dir = vec_to_center / dist_to_center if dist_to_center > 1e-6 else np.array([0, 0])
                             
-                            # Student (40%) + Gradient (25%) + Teacher (20%) + Centre GP (15%)
-                            combined = 0.4 * action_student[:2] + 0.25 * grad_dir + 0.2 * teacher_dir + 0.15 * center_dir
+                            # Mélange adaptatif : Teacher (selon confiance) + Student (selon confiance) + Gradient + Centre
+                            # Poids adaptatifs : Teacher et Student varient, Gradient et Centre fixes
+                            combined = teacher_weight * teacher_dir + student_weight * action_student[:2] + 0.25 * grad_dir + 0.15 * center_dir
                             combined_norm = np.linalg.norm(combined)
                             if combined_norm > 1e-6:
                                 combined = combined / combined_norm
@@ -2986,13 +3084,14 @@ def run_simulation():
                             else:
                                 action = np.clip(action_student, -1, 1)
                         else:
-                            # Sans gradient, combiner Student + Teacher + Centre
+                            # Sans gradient, combiner Student + Teacher + Centre (mélange adaptatif)
                             search_center = estimated_source if estimated_source is not None else target_position
-                            vec_to_center = search_center - current_pos
+                            vec_to_center = np.array(search_center) - current_pos[:2]  # Utiliser seulement x, y
                             dist_to_center = np.linalg.norm(vec_to_center)
                             center_dir = vec_to_center / dist_to_center if dist_to_center > 1e-6 else np.array([0, 0])
                             
-                            combined = 0.5 * action_student[:2] + 0.3 * teacher_dir + 0.2 * center_dir
+                            # Mélange adaptatif : Teacher (selon confiance) + Student (selon confiance) + Centre
+                            combined = teacher_weight * teacher_dir + student_weight * action_student[:2] + 0.2 * center_dir
                             combined_norm = np.linalg.norm(combined)
                             if combined_norm > 1e-6:
                                 combined = combined / combined_norm
@@ -3022,9 +3121,9 @@ def run_simulation():
                                     gradient_x=grad_x,
                                     gradient_y=grad_y,
                                     target_position=None,  # Près: focus sur gradient
-                                    estimated_source=tuple(estimated_source) if estimated_source is not None else None
+                                    estimated_source=tuple(estimated_source) if estimated_source is not None and len(estimated_source) == 2 else None
                                 )
-                                teacher_vec = np.array([next_x, next_y]) - current_pos
+                                teacher_vec = np.array([next_x, next_y]) - current_pos[:2]  # Utiliser seulement x, y
                                 teacher_norm = np.linalg.norm(teacher_vec)
                                 if teacher_norm > 0.1:
                                     teacher_dir = teacher_vec / teacher_norm
@@ -3033,7 +3132,7 @@ def run_simulation():
                         
                         # Utiliser l'estimation GP si disponible, sinon la position réelle
                         search_center = estimated_source if estimated_source is not None else target_position
-                        vec_to_center = search_center - current_pos
+                        vec_to_center = np.array(search_center) - current_pos[:2]  # Utiliser seulement x, y
                         dist_to_center = np.linalg.norm(vec_to_center)
                         
                         grad_norm = np.linalg.norm([grad_x, grad_y])
@@ -3044,8 +3143,8 @@ def run_simulation():
                             search_angle = angle_to_center + (step * 0.3) % (2 * np.pi)
                             circular_dir = np.array([np.cos(search_angle), np.sin(search_angle)])
                             center_dir = vec_to_center / dist_to_center if dist_to_center > 1e-6 else np.array([0, 0])
-                            # Student (30%) + Gradient (25%) + Teacher (20%) + Spirale (15%) + Centre (10%)
-                            combined = 0.3 * action_student[:2] + 0.25 * grad_dir + 0.2 * teacher_dir + 0.15 * circular_dir + 0.1 * center_dir
+                            # Mélange adaptatif : Teacher (selon confiance) + Student (selon confiance) + Gradient + Spirale + Centre
+                            combined = teacher_weight * teacher_dir + student_weight * action_student[:2] + 0.25 * grad_dir + 0.15 * circular_dir + 0.1 * center_dir
                             combined_norm = np.linalg.norm(combined)
                             if combined_norm > 1e-6:
                                 combined = combined / combined_norm
@@ -3059,8 +3158,8 @@ def run_simulation():
                             search_angle = angle_to_center + (step * 0.4) % (2 * np.pi)
                             tangent_dir = np.array([-np.sin(search_angle), np.cos(search_angle)])
                             center_dir = vec_to_center / dist_to_center if dist_to_center > 1e-6 else np.array([0, 0])
-                            # Student (40%) + Teacher (25%) + Tangente (20%) + Centre (15%)
-                            combined = 0.4 * action_student[:2] + 0.25 * teacher_dir + 0.2 * tangent_dir + 0.15 * center_dir
+                            # Mélange adaptatif : Teacher (selon confiance) + Student (selon confiance) + Tangente + Centre
+                            combined = teacher_weight * teacher_dir + student_weight * action_student[:2] + 0.2 * tangent_dir + 0.15 * center_dir
                             combined_norm = np.linalg.norm(combined)
                             if combined_norm > 1e-6:
                                 combined = combined / combined_norm
@@ -3116,7 +3215,7 @@ def run_simulation():
                         if distance_to_target > 25.0:
                             # Utiliser estimation GP si disponible
                             nav_target = estimated_source if estimated_source is not None else target_position
-                            vec_to_nav = nav_target - current_pos
+                            vec_to_nav = np.array(nav_target) - current_pos[:2]  # Utiliser seulement x, y
                             dist_to_nav = np.linalg.norm(vec_to_nav)
                             if dist_to_nav > 1e-6:
                                 nav_dir = vec_to_nav / dist_to_nav
@@ -3155,10 +3254,24 @@ def run_simulation():
                 next_obs = env._get_observation(teacher)
                 student.store_experience(obs, action, reward, next_obs, terminated or truncated)
                 
+                # Apprentissage plus fréquent pour améliorer les performances
                 if len(student.replay_buffer) > student.config.learning_starts:
                     metrics = student.learn()
-                    if step % 50 == 0:
-                        log_message(f"Apprentissage - Perte: {metrics.get('total_loss', 0):.4f}, ε: {metrics.get('epsilon', 0):.3f}")
+                    
+                    # Calcul de la confiance pour logging
+                    student_confidence = 0.0
+                    if len(student.loss_history) > 10:
+                        recent_losses = student.loss_history[-10:]
+                        avg_loss = np.mean(recent_losses)
+                        student_confidence = max(0.0, min(1.0, 1.0 - (avg_loss / 0.5)))
+                    else:
+                        student_confidence = 0.1
+                    
+                    teacher_weight = 0.8 - (0.5 * student_confidence)
+                    student_weight = 0.2 + (0.5 * student_confidence)
+                    
+                    if step % 30 == 0:  # Log plus fréquent
+                        log_message(f"Apprentissage - Perte: {metrics.get('total_loss', 0):.4f}, ε: {metrics.get('epsilon', 0):.3f}, Confiance Student: {student_confidence:.2f}, Poids T/S: {teacher_weight:.2f}/{student_weight:.2f}")
                 
                 obs = next_obs
                 student.step_count += 1
@@ -3246,12 +3359,31 @@ def run_simulation():
                     realtime_metrics['estimated_position'] = temp_estimated
                     realtime_metrics['estimation_confidence'] = temp_confidence
                     
-                    # ARRÊT AUTOMATIQUE si confiance suffisante (>= 0.85)
+                    # NOTIFICATION de détection (mais on continue pour détecter d'autres fuites)
                     if temp_confidence >= 0.85:
-                        log_message(f"ARRET AUTOMATIQUE: Position estimee avec confiance elevee ({temp_confidence:.1%})")
-                        log_message(f"Position estimee finale: ({temp_estimated[0]:.2f}, {temp_estimated[1]:.2f}) m")
-                        terminated = True  # Arrêter la simulation
-                        break  # Sortir de la boucle
+                        # Vérifier si cette position n'a pas déjà été détectée
+                        is_new_detection = True
+                        if 'detected_leaks' in st.session_state:
+                            for detected in st.session_state.detected_leaks:
+                                dist = np.linalg.norm(temp_estimated - np.array(detected['position']))
+                                if dist < 5.0:  # Si déjà détectée à moins de 5m
+                                    is_new_detection = False
+                                    break
+                        
+                        if is_new_detection:
+                            # Stocker la nouvelle détection
+                            if 'detected_leaks' not in st.session_state:
+                                st.session_state.detected_leaks = []
+                            st.session_state.detected_leaks.append({
+                                'position': temp_estimated.tolist(),
+                                'confidence': temp_confidence,
+                                'step': step,
+                                'time': step * env_config.time_step
+                            })
+                            log_message(f"⚠️ POINT POTENTIEL DE FUITE DÉTECTÉ: ({temp_estimated[0]:.2f}, {temp_estimated[1]:.2f}) m | Confiance: {temp_confidence:.1%}")
+                            log_message(f"   La recherche continue pour détecter d'autres fuites...")
+                            # Afficher une notification mais continuer
+                            st.warning(f"🔍 **Point de fuite détecté** : ({temp_estimated[0]:.2f}, {temp_estimated[1]:.2f}) m | Confiance: {temp_confidence:.1%} | La recherche continue...")
             
             # Progression
             progress = (step + 1) / ai_config['max_steps'] * 100
@@ -3517,10 +3649,10 @@ def run_simulation():
         detection_rate = detection_count / max(1, step) * 100
         energy_efficiency = detection_count / max(1, energy_consumed) * 1000
         
-        # Vérifier si arrêt automatique a eu lieu
+        # Note: On ne s'arrête plus automatiquement pour permettre la détection de plusieurs fuites
+        # L'arrêt automatique est désactivé en mode multi-fuites
         auto_stopped = False
-        if estimated_pos is not None and estimation_confidence >= 0.85:
-            auto_stopped = True
+        # Ne plus arrêter automatiquement - on continue pour détecter toutes les fuites
         
         # Vérifier si validateur GP a été utilisé
         gp_validator_used = enhanced_detector.use_gp_validator and enhanced_detector.gp_validator is not None
@@ -3564,14 +3696,105 @@ def run_simulation():
         else:
             log_message(f"MISSION PARTIELLE - Score: {performance_metrics.overall_score:.1f}/100")
         
-        # AFFICHAGE FINAL DE LA POSITION ESTIMÉE
-        if estimated_pos is not None:
-            st.success(f"**POSITION ESTIMÉE (GP VALIDATOR):** ({estimated_pos[0]:.2f}, {estimated_pos[1]:.2f}) m | Confiance: {estimation_confidence:.1%}")
-            if estimation_confidence >= 0.85:
-                st.balloons()  # Animation de célébration pour excellente détection
-                st.info("**ARRÊT AUTOMATIQUE:** Position estimée avec confiance élevée - Simulation arrêtée automatiquement")
+        # AFFICHAGE FINAL DE TOUTES LES POSITIONS DÉTECTÉES
+        st.markdown("---")
+        st.markdown("###  **RÉSULTATS DE LA DÉTECTION**")
         
-        st.success(f"Simulation terminée: {detection_count} détections détectées")
+        # Récupérer toutes les fuites détectées
+        all_detected_leaks = st.session_state.get('detected_leaks', [])
+        
+        # Ajouter la position estimée finale si elle n'est pas déjà dans la liste
+        if estimated_pos is not None:
+            # Vérifier si cette position n'est pas déjà dans la liste
+            is_already_detected = False
+            for detected in all_detected_leaks:
+                dist = np.linalg.norm(estimated_pos - np.array(detected['position']))
+                if dist < 5.0:  # Si déjà détectée à moins de 5m
+                    is_already_detected = True
+                    # Mettre à jour la confiance si plus élevée
+                    if estimation_confidence > detected['confidence']:
+                        detected['confidence'] = estimation_confidence
+                    break
+            
+            if not is_already_detected:
+                all_detected_leaks.append({
+                    'position': estimated_pos.tolist(),
+                    'confidence': estimation_confidence,
+                    'step': step,
+                    'time': step * env_config.time_step
+                })
+        
+        # Afficher toutes les détections
+        if all_detected_leaks:
+            st.success(f" **{len(all_detected_leaks)} potentiels points de fuite détectés (s)**")
+            
+            # Créer un DataFrame pour affichage
+            leaks_df = pd.DataFrame([
+                {
+                    'ID': i+1,
+                    'Position X (m)': f"{leak['position'][0]:.2f}",
+                    'Position Y (m)': f"{leak['position'][1]:.2f}",
+                    'Confiance': f"{leak['confidence']:.1%}",
+                    'Étape': leak['step'],
+                    'Temps (s)': f"{leak['time']:.1f}"
+                }
+                for i, leak in enumerate(all_detected_leaks)
+            ])
+            st.dataframe(leaks_df, use_container_width=True, hide_index=True)
+            
+            # Afficher sur la carte si possible
+            if len(all_detected_leaks) > 0:
+                st.markdown("**Carte des positions détectées :**")
+                fig = go.Figure()
+                
+                # Ajouter les positions détectées
+                for i, leak in enumerate(all_detected_leaks):
+                    pos = leak['position']
+                    conf = leak['confidence']
+                    fig.add_trace(go.Scatter(
+                        x=[pos[0]],
+                        y=[pos[1]],
+                        mode='markers+text',
+                        marker=dict(
+                            size=20,
+                            color='red',
+                            symbol='star',
+                            line=dict(width=2, color='darkred')
+                        ),
+                        text=[f"Fuite {i+1}<br>Conf: {conf:.1%}"],
+                        textposition="top center",
+                        name=f"Fuite détectée {i+1}",
+                        hovertemplate=f"<b>Fuite {i+1}</b><br>Position: ({pos[0]:.2f}, {pos[1]:.2f}) m<br>Confiance: {conf:.1%}<extra></extra>"
+                    ))
+                
+                # Ajouter la trajectoire
+                if trajectory:
+                    traj_array = np.array(trajectory)
+                    fig.add_trace(go.Scatter(
+                        x=traj_array[:, 0],
+                        y=traj_array[:, 1],
+                        mode='lines',
+                        line=dict(color='blue', width=2),
+                        name='Trajectoire du drone',
+                        hovertemplate="Trajectoire<extra></extra>"
+                    ))
+                
+                fig.update_layout(
+                    title="Carte des Fuites Détectées",
+                    xaxis_title="X (m)",
+                    yaxis_title="Y (m)",
+                    width=800,
+                    height=600,
+                    showlegend=True
+                )
+                st.plotly_chart(fig, use_container_width=True)
+        else:
+            if estimated_pos is not None:
+                st.info(f"**Position estimée (GP VALIDATOR):** ({estimated_pos[0]:.2f}, {estimated_pos[1]:.2f}) m | Confiance: {estimation_confidence:.1%}")
+            else:
+                st.warning("Aucune fuite détectée avec confiance suffisante.")
+        
+        st.success(f"Simulation terminée: {detection_count} détections détectées, {len(all_detected_leaks)} point(s) de fuite identifié(s)")
         
     except Exception as e:
         log_message(f"Erreur: {e}")
