@@ -12,14 +12,14 @@ Architecture:
 - Visualisation: Outils d'analyse et de comparaison
 
 Auteurs:
-- Housséni YABRE (Lead AI Engineer)
-- Kabinet SYLLA (Simulation & Physics)
-- Nobert Bassooma DIDANERA (System Integration)
+- Housséni YABRE - ETUDIANT en Informatique et Systèmes d'Information à l'UTT
+- Kabinet SYLLA - ETUDIANT en Informatique et Systèmes d'Information à l'UTT
+- Nobert Bassooma DIDANERA - Etudiant en fin de Master IA et Big Data, En mobilité à l'UTT
 """
 
 __version__ = "1.0.0"
 __author__ = "Équipe HIGHLIGHT+"
-__email__ = "highlight.plus@utt.fr"
+__email__ = "housseni.yabre@utt.fr"
 
 # Import des composants principaux
 from .simulation.plume_model import MethanePlume, PlumeConfig

@@ -317,11 +317,13 @@ class EnhancedDetector:
                     min_distance=min_distance
                 )
                 if all_positions:
-                    # Convertir en numpy arrays
+                    # Convertir en numpy arrays et garantir que les probabilités sont dans [0, 1]
                     result = []
                     for pos, prob in all_positions:
                         pos_array = np.array(pos)
-                        result.append((pos_array.copy(), float(prob)))
+                        # IMPORTANT : S'assurer que la probabilité est dans [0, 1]
+                        prob_clipped = float(np.clip(prob, 0.0, 1.0))
+                        result.append((pos_array.copy(), prob_clipped))
                     return result
             except Exception as e:
                 # En cas d'erreur, fallback

@@ -18,6 +18,7 @@ from datetime import datetime
 import json
 import sys
 import os
+import base64
 
 # Ajout du chemin du projet
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
@@ -133,21 +134,14 @@ from highlight_plus.sensors.tdlas_sensor import TDLASSensor, TDLASConfig
 from highlight_plus.models.teacher_gp import GaussianProcessTeacher, TeacherConfig
 from highlight_plus.models.student_rl import StudentRL, StudentConfig
 from highlight_plus.simulation.environment import MethaneDetectionEnv, EnvironmentConfig
-from highlight_plus.analysis.learning_analysis import LearningAnalyzer
-from highlight_plus.experiments.leak_position_test import LeakPositionTester
 from highlight_plus.analysis.performance_validator import PerformanceValidator
 from highlight_plus.analysis.enhanced_detector import EnhancedDetector
 
-# Version simplifiée pour démonstration
-try:
-    from highlight_simple import SimpleConfig, SimpleSimulator, ComparativeAnalyzer
-    SIMPLE_VERSION_AVAILABLE = True
-except ImportError:
-    SIMPLE_VERSION_AVAILABLE = False
+# Pas de dépendance externe - version naïve implémentée directement
 
 # Configuration de la page
 st.set_page_config(
-    page_title="HIGHLIGHT+",
+    page_title="HIGHLIGHT+ - Détection Intelligente de Méthane",
     page_icon="",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -166,51 +160,124 @@ st.markdown("""
     /* === HEADER PRINCIPAL === */
     .main-header {
         background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
-        padding: 4rem 2rem;
-        border-radius: 0;
-        margin: -1rem -1rem 2rem -1rem;
-        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
-        border-bottom: 4px solid #00d4ff;
+        padding: 5rem 2rem;
+        border-radius: 20px;
+        margin: -1rem -1rem 3rem -1rem;
+        box-shadow: 0 6px 30px rgba(0, 0, 0, 0.2), 0 0 60px rgba(0, 212, 255, 0.1);
+        border-bottom: 5px solid #00d4ff;
+        position: relative;
+        overflow: hidden;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+    }
+    
+    .header-logos {
+        display: flex;
+        align-items: center;
+        gap: 2rem;
+        position: absolute;
+        left: 2rem;
+        top: 50%;
+        transform: translateY(-50%);
+        z-index: 10;
+    }
+    
+    .header-logo {
+        height: 80px;
+        width: auto;
+        object-fit: contain;
+        filter: drop-shadow(0 2px 8px rgba(255, 255, 255, 0.3));
+        transition: transform 0.3s ease;
+    }
+    
+    .header-logo:hover {
+        transform: scale(1.05);
+    }
+    
+    .header-content {
+        flex: 1;
+        text-align: center;
+        position: relative;
+        z-index: 5;
+        margin-left: 280px;
+        padding-right: 2rem;
+    }
+    
+    .main-header::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: radial-gradient(circle at 50% 50%, rgba(0, 212, 255, 0.1) 0%, transparent 70%);
+        pointer-events: none;
     }
     
     .main-title {
         color: #ffffff;
-        font-size: 6.5rem;
+        font-size: 10.5rem;
         font-weight: 900;
-        letter-spacing: 4px;
+        letter-spacing: 8px;
         margin: 0;
         text-align: center;
         text-transform: uppercase;
         font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
         text-shadow: 
-            2px 2px 4px rgba(0, 0, 0, 1),
-            4px 4px 8px rgba(0, 0, 0, 0.9),
-            6px 6px 12px rgba(0, 0, 0, 0.8),
-            0 0 20px rgba(255, 255, 255, 0.9),
-            0 0 40px rgba(255, 255, 255, 0.7),
-            0 0 60px rgba(255, 255, 255, 0.5);
-        line-height: 1.1;
-        -webkit-text-stroke: 2px rgba(0, 0, 0, 0.5);
-        filter: drop-shadow(0 0 20px rgba(255, 255, 255, 0.8)) drop-shadow(0 0 40px rgba(255, 255, 255, 0.6));
+            3px 3px 6px rgba(0, 0, 0, 1),
+            6px 6px 12px rgba(0, 0, 0, 0.9),
+            9px 9px 18px rgba(0, 0, 0, 0.8),
+            0 0 30px rgba(255, 255, 255, 0.9),
+            0 0 60px rgba(255, 255, 255, 0.7),
+            0 0 90px rgba(255, 255, 255, 0.5);
+        line-height: 1.0;
+        -webkit-text-stroke: 3px rgba(0, 0, 0, 0.5);
+        filter: drop-shadow(0 0 30px rgba(255, 255, 255, 0.9)) drop-shadow(0 0 60px rgba(255, 255, 255, 0.7));
+        animation: glow 2s ease-in-out infinite alternate;
+    }
+    
+    @keyframes glow {
+        from {
+            text-shadow: 
+                3px 3px 6px rgba(0, 0, 0, 1),
+                6px 6px 12px rgba(0, 0, 0, 0.9),
+                9px 9px 18px rgba(0, 0, 0, 0.8),
+                0 0 30px rgba(255, 255, 255, 0.9),
+                0 0 60px rgba(255, 255, 255, 0.7),
+                0 0 90px rgba(255, 255, 255, 0.5);
+        }
+        to {
+            text-shadow: 
+                3px 3px 6px rgba(0, 0, 0, 1),
+                6px 6px 12px rgba(0, 0, 0, 0.9),
+                9px 9px 18px rgba(0, 0, 0, 0.8),
+                0 0 40px rgba(0, 212, 255, 0.9),
+                0 0 80px rgba(0, 212, 255, 0.7),
+                0 0 120px rgba(0, 212, 255, 0.5);
+        }
     }
     
     .main-subtitle {
         color: #b8d4f0;
-        font-size: 1.1rem;
-        margin: 0.8rem 0 0 0;
+        font-size: 1.4rem;
+        margin: 1.2rem 0 0 0;
         text-align: center;
-        font-weight: 300;
-        letter-spacing: 2px;
+        font-weight: 400;
+        letter-spacing: 3px;
         text-transform: uppercase;
+        text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
     }
     
     .main-tagline {
         color: #00d4ff;
-        font-size: 0.95rem;
-        margin: 1rem 0 0 0;
+        font-size: 1.1rem;
+        margin: 1.2rem 0 0 0;
         text-align: center;
         font-style: italic;
         font-weight: 400;
+        text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.6);
+        letter-spacing: 1px;
     }
     
     /* === METRICS CARDS === */
@@ -492,10 +559,17 @@ st.markdown("""
 # Initialisation de la session
 if 'simulation_results' not in st.session_state:
     st.session_state.simulation_results = {}
-if 'learning_history' not in st.session_state:
-    st.session_state.learning_history = []
 if 'leak_positions' not in st.session_state:
     st.session_state.leak_positions = []
+
+# Fonction helper pour convertir une image en base64
+def get_base64_image(image_path: str) -> str:
+    """Convertit une image en base64 pour l'affichage dans HTML"""
+    try:
+        with open(image_path, "rb") as img_file:
+            return base64.b64encode(img_file.read()).decode()
+    except FileNotFoundError:
+        return ""
 
 # Fonction helper pour obtenir le nom d'affichage d'un mode
 def get_mode_display_name(mode_value: str) -> str:
@@ -541,23 +615,29 @@ if 'ai_config' not in st.session_state:
 def main():
     """Fonction principale de l'application"""
     
-    # En-tête principal professionnel
+    # En-tête principal professionnel amélioré avec logos
     st.markdown("""
     <div class="main-header fade-in">
-        <h1 class="main-title">HIGHLIGHT+</h1>
-        <p class="main-subtitle">Optimisation Intelligente des Trajectoires</p>
-        <p class="main-tagline">Détection de Micro-fuites de Méthane par Architecture Teacher-Student</p>
+        <div class="header-logos">
+            <img src="data:image/png;base64,{}" class="header-logo" alt="Logo UTT" />
+            <img src="data:image/png;base64,{}" class="header-logo" alt="Logo NATRAN" />
+        </div>
+        <div class="header-content">
+            <h1 class="main-title">HIGHLIGHT+</h1>
+            <p class="main-subtitle">Optimisation Intelligente des Trajectoires</p>
+            <p class="main-tagline">Détection de Micro-fuites de Méthane par Architecture Teacher-Student</p>
+        </div>
     </div>
-    """, unsafe_allow_html=True)
+    """.format(
+        get_base64_image("logo_UTT.png"),
+        get_base64_image("logo_natran.png")
+    ), unsafe_allow_html=True)
     
     # Navigation principale
     tab_labels = [
         "Simulation",
         "Configuration",
-        "Comparaison Simplifiée",
-        "Analyse d'Apprentissage",
-        "Tests de Robustesse",
-        "Résultats & Métriques"
+        "Comparaison Simplifiée"
     ]
     
     main_tabs = st.tabs(tab_labels)
@@ -570,15 +650,6 @@ def main():
     
     with main_tabs[2]:
         show_comparative_simple_tab()
-    
-    with main_tabs[3]:
-        show_learning_analysis_tab()
-    
-    with main_tabs[4]:
-        show_robustness_tests_tab()
-    
-    with main_tabs[5]:
-        show_results_tab()
 
 def show_simulation_tab():
     """Onglet de simulation principal"""
@@ -665,7 +736,6 @@ def show_simulation_tab():
     with col3:
         if st.button("Réinitialiser", use_container_width=True, key="btn_reset_sim"):
             st.session_state.simulation_results = {}
-            st.session_state.learning_history = []
             st.session_state.simulation_logs = []
             st.success("État réinitialisé")
     
@@ -1021,79 +1091,9 @@ def show_ai_config():
     else:
         st.info(f"**{mode_display}** : Combine l'Expert (planification stratégique) et l'Apprenti (pilotage tactique) avec stratégie adaptative. Le Student apprend progressivement du Teacher.")
 
-def show_learning_analysis_tab():
-    """Onglet d'analyse d'apprentissage"""
-    st.markdown('<div class="section-header">Analyse de l\'Apprentissage</div>', unsafe_allow_html=True)
-    
-    # Note informative sur l'apprentissage
-    st.info("""
-    **Note** : Cette section analyse l'apprentissage du Student (RL) dans le **Mode Teacher-Student**. 
-    Le système utilise une **stratégie adaptative** où :
-    - Au début : Teacher (80%) + Student (20%) - Le Student apprend du Teacher
-    - Progressivement : Les poids s'ajustent selon la confiance du Student
-    - À la fin : Teacher (30%) + Student (70%) - Le Student devient autonome
-    
-    Pour la détection de position de fuite, le système utilise un **Validateur GP** qui estime 
-    la position avec une probabilité de confiance. En mode multi-fuites, le système continue 
-    la recherche après chaque détection pour identifier toutes les fuites.
-    """)
-    
-    col1, col2 = st.columns([2, 1])
-    
-    with col1:
-        if st.button("Lancer l'Analyse d'Apprentissage", type="primary", use_container_width=True, key="btn_launch_analysis"):
-            run_learning_analysis()
-    
-    with col2:
-        if st.button("Réinitialiser", use_container_width=True, key="btn_reset_analysis"):
-            st.session_state.learning_history = []
-    
-    if st.session_state.learning_history:
-        display_learning_metrics()
-
-def show_robustness_tests_tab():
-    """Onglet de tests de robustesse"""
-    st.markdown('<div class="section-header">Tests de Robustesse</div>', unsafe_allow_html=True)
-    
-    # Note informative sur les tests de robustesse
-    st.info("""
-    **Tests de Robustesse** : Les tests utilisent le **Validateur GP** pour estimer la position de fuite 
-    avec une probabilité de confiance. La précision affichée est basée sur l'estimation GP (Processus Gaussiens).
-    
-    Les tests peuvent être effectués avec différents modes :
-    - **Mode Simple** : Stratégie multi-phase basique
-    - **Mode Teacher** : Utilise uniquement l'Expert (GP)
-    - **Mode Teacher-Student** : Utilise l'Expert + l'Apprenti avec stratégie adaptative
-    
-    En mode multi-fuites, le système détecte toutes les fuites configurées sans s'arrêter après la première détection.
-    """)
-    
-    if not st.session_state.leak_positions:
-        st.warning("Aucune position de fuite configurée. Configurez les positions dans l'onglet Configuration.")
-        return
-    
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        test_iterations = st.number_input("Itérations par Position", min_value=1, max_value=20, value=5)
-    with col2:
-        test_steps = st.number_input("Étapes par Test", min_value=50, max_value=1000, value=200)
-    with col3:
-        test_mode = st.selectbox("Mode de Test", ["all", "teacher", "student", "comparison"])
-    
-    if st.button("Lancer Tests Complets", type="primary", use_container_width=True, key="btn_launch_tests"):
-        run_position_tests(test_iterations, test_steps, test_mode)
-    
-    if 'test_results' in st.session_state:
-        display_test_results()
-
 def show_comparative_simple_tab():
     """Onglet de comparaison simplifiée Naïve vs HIGHLIGHT+"""
     st.markdown('<div class="section-header">Comparaison Simplifiée : Naïve vs HIGHLIGHT+</div>', unsafe_allow_html=True)
-    
-    if not SIMPLE_VERSION_AVAILABLE:
-        st.error("La version simplifiee n'est pas disponible. Assurez-vous que le module `highlight_simple` est installe.")
-        st.info("Pour installer, executez : `pip install numpy matplotlib`")
-        return
     
     # Introduction
     st.markdown("""
@@ -1177,22 +1177,6 @@ def generate_comparative_results(leak_x, leak_y, start_x, start_y, max_steps, n_
     """Génère les résultats comparatifs avec le VRAI modèle HIGHLIGHT+"""
     with st.spinner("Generation des simulations comparatives..."):
         try:
-            # Configuration pour Naïve (simple)
-            # Normalisation du seuil pour SimpleConfig : SimpleConfig utilise des concentrations normalisées [0,1]
-            # On convertit le seuil kg/m³ en seuil normalisé
-            # Pour une intensité de 1.0, la concentration max ≈ 0.15 kg/m³ proche de la source
-            # Donc seuil normalisé ≈ threshold / (intensity * 0.15)
-            typical_max_conc_kg = intensity * 0.15
-            normalized_threshold = min(1.0, max(0.01, threshold / typical_max_conc_kg)) if typical_max_conc_kg > 0 else 0.3
-            
-            simple_config = SimpleConfig(
-                leak_position=(leak_x, leak_y),
-                initial_position=(start_x, start_y),
-                max_steps=max_steps,
-                detection_threshold=normalized_threshold,  # Seuil normalisé pour comparaison équitable
-                leak_intensity=intensity
-            )
-            
             # Configuration pour HIGHLIGHT+ (vrai modèle)
             plume_config = PlumeConfig(
                 leak_x=leak_x,
@@ -1233,23 +1217,79 @@ def generate_comparative_results(leak_x, leak_y, start_x, start_y, max_steps, n_
             status_text = progress_container.empty()
             
             for run in range(n_runs):
-                status_text.text(f"Run {run+1}/{n_runs} : Simulation Naïve...")
+                status_text.text(f"Run {run+1}/{n_runs} : Simulation Naïve (zigzag)...")
                 
-                # Simulation Naïve (simple)
-                sim_naive = SimpleSimulator(simple_config, agent_type="naive")
-                result_naive = sim_naive.run()
+                # Simulation Naïve (zigzag systématique) - Implémentation directe
+                env_naive = MethaneDetectionEnv(env_config, plume_config, sensor_config)
+                obs_naive, info_naive = env_naive.reset()
+                
+                trajectory_naive = [env_naive.drone_position.copy()]
+                detection_count_naive = 0
+                energy_consumed_naive = 0.0
+                first_detection_step_naive = None
+                true_leak_pos = (plume_config.leak_x, plume_config.leak_y)
+                
+                # Pattern zigzag : mouvement systématique en grille
+                zigzag_step_size = 5.0  # Taille du pas pour le zigzag
+                current_x = start_x
+                current_y = start_y
+                direction = 1  # 1 pour droite, -1 pour gauche
+                
+                for step in range(max_steps):
+                    # Pattern zigzag : alternance horizontale avec progression verticale
+                    if step % 10 == 0:  # Changer de direction tous les 10 pas
+                        direction *= -1
+                    
+                    # Mouvement horizontal avec progression verticale
+                    if direction > 0:
+                        current_x = min(100.0, current_x + zigzag_step_size * 0.1)
+                    else:
+                        current_x = max(0.0, current_x - zigzag_step_size * 0.1)
+                    
+                    # Progression verticale lente
+                    if step % 20 == 0:
+                        current_y = min(100.0, current_y + zigzag_step_size * 0.05)
+                    
+                    # Action pour atteindre la position cible
+                    target_pos = np.array([current_x, current_y, 5.0])
+                    current_pos_3d = env_naive.drone_position
+                    direction_vec = target_pos - current_pos_3d
+                    direction_norm = np.linalg.norm(direction_vec)
+                    
+                    if direction_norm > 0.1:
+                        action_naive = direction_vec[:3] / direction_norm * 0.5
+                        action_naive = np.clip(action_naive, -1, 1)
+                    else:
+                        action_naive = env_naive.action_space.sample() * 0.3
+                    
+                    obs_naive, reward_naive, terminated_naive, truncated_naive, info_naive = env_naive.step(action_naive)
+                    trajectory_naive.append(env_naive.drone_position.copy())
+                    energy_consumed_naive = info_naive.get('total_energy', energy_consumed_naive)
+                    
+                    # Détection simple
+                    if info_naive.get('detected', False) or (info_naive.get('measured_concentration', 0) > sensor_config.detection_threshold):
+                        if first_detection_step_naive is None:
+                            first_detection_step_naive = step
+                        detection_count_naive += 1
+                    
+                    if terminated_naive or truncated_naive:
+                        break
+                
+                final_distance_naive = np.linalg.norm(np.array([env_naive.drone_position[0], env_naive.drone_position[1]]) - np.array(true_leak_pos))
+                detection_time_naive = first_detection_step_naive * env_config.time_step if first_detection_step_naive is not None else None
+                
                 results_naive_list.append({
-                    'n_detections': result_naive['n_detections'],
-                    'detection_rate': result_naive['detection_rate'],
-                    'energy_consumed': result_naive['energy_consumed'],
-                    'detection_time': result_naive['detection_time'],
-                    'final_distance': result_naive['final_distance'],
-                    'trajectory': result_naive['trajectory']
+                    'n_detections': detection_count_naive,
+                    'detection_rate': detection_count_naive / max(1, step + 1) * 100,
+                    'energy_consumed': energy_consumed_naive,
+                    'detection_time': detection_time_naive,
+                    'final_distance': final_distance_naive,
+                    'trajectory': np.array(trajectory_naive)
                 })
                 
                 status_text.text(f"Run {run+1}/{n_runs} : Simulation HIGHLIGHT+ (Mode Teacher-Student)...")
                 
-                # Simulation HIGHLIGHT+ (vrai modèle)
+                # Simulation HIGHLIGHT+ (vrai modèle avec Mode Teacher-Student)
                 env = MethaneDetectionEnv(env_config, plume_config, sensor_config)
                 obs, info = env.reset()
                 
@@ -1276,180 +1316,129 @@ def generate_comparative_results(leak_x, leak_y, start_x, start_y, max_steps, n_
                     world_bounds=(0, 100, 0, 100)
                 )
                 
-                # Détecteur amélioré avec validateur GP (pour métriques avancées)
-                true_leak_pos = (plume_config.leak_x, plume_config.leak_y)
+                # Initialisation Student (Mode Teacher-Student)
+                student_config = StudentConfig(
+                    learning_rate=ai_config.get('student_learning_rate', 2.5e-4),
+                    lambda_kl=ai_config.get('student_lambda_kl', 0.15),
+                    batch_size=ai_config.get('batch_size', 128),
+                    buffer_size=ai_config.get('buffer_size', 20000),
+                    learning_starts=200
+                )
+                student = StudentRL(
+                    state_dim=16,
+                    action_dim=3,
+                    config=student_config,
+                    teacher=teacher
+                )
+                
+                # Détecteur amélioré avec validateur GP
                 enhanced_detector = EnhancedDetector(
                     true_leak_position=true_leak_pos,
                     detection_threshold=sensor_config.detection_threshold,
-                    confidence_threshold=0.3,  # Plus permissif pour comparaison
+                    confidence_threshold=0.3,
                     min_distance_for_detection=50.0,
                     use_gp_validator=True,  # Activer le validateur GP
                     gp_threshold_prob=0.95
                 )
                 
-                # Simulation
+                # Simulation avec Mode Teacher-Student (vrai modèle)
                 trajectory_highlight = []
-                detection_count = 0  # Comptage simple comme Naïve (équitable)
+                detection_count = 0
                 energy_consumed = 0.0
                 first_detection_step = None
-                search_radius = 0.0  # Rayon de recherche locale
-                last_detection_concentration = 0.0
+                obs_state = obs
                 
                 for step in range(max_steps):
                     current_pos = env.drone_position[:2]
-                    distance_to_source = np.linalg.norm(current_pos - np.array(true_leak_pos))
                     
-                    # Calcul du gradient avec adaptation selon la distance
+                    # Calcul du gradient
                     grad_x, grad_y = env.plume.gradient(
                         current_pos[0],
                         current_pos[1],
                         step * env_config.time_step
                     )
                     
-                    # Navigation optimisée pour maximiser les détections
-                    target_position = np.array([plume_config.leak_x, plume_config.leak_y])
-                    vec_to_target = target_position - current_pos
-                    distance_to_target = np.linalg.norm(vec_to_target)
+                    # STRATÉGIE ADAPTATIVE : Calcul de la confiance du Student
+                    student_confidence = 0.0
+                    teacher_weight = 0.8
+                    student_weight = 0.2
                     
-                    # Mesure de concentration pour stratégie adaptative
-                    concentration_at_pos = env.plume.concentration(
-                        current_pos[0],
-                        current_pos[1],
-                        step * env_config.time_step
-                    )
+                    if student is not None and len(student.loss_history) > 10:
+                        # Confiance basée sur la perte moyenne récente
+                        recent_losses = student.loss_history[-10:]
+                        avg_loss = np.mean(recent_losses)
+                        # Normaliser la perte (0.0 = excellente, 1.0 = mauvaise)
+                        student_confidence = max(0.0, min(1.0, 1.0 - (avg_loss / 0.5)))
+                        # Poids adaptatifs : Teacher dominant au début, Student augmente avec la confiance
+                        teacher_weight = 0.8 - (0.5 * student_confidence)  # De 0.8 à 0.3
+                        student_weight = 0.2 + (0.5 * student_confidence)  # De 0.2 à 0.7
+                    elif student is not None:
+                        # Au début, confiance très faible (favoriser Teacher)
+                        student_confidence = 0.1
+                        teacher_weight = 0.8
+                        student_weight = 0.2
                     
-                    # STRATÉGIE MULTI-PHASE OPTIMISÉE POUR 90%+ DE DÉTECTION
-                    if distance_to_target > 25.0:
-                        # PHASE 1: NAVIGATION RAPIDE VERS LA SOURCE (loin de la cible)
-                        # Navigation ultra-directe vers la source avec vitesse maximale
-                        if distance_to_target > 1e-6:
-                            target_dir = vec_to_target / distance_to_target
-                            # Vitesse maximale pour atteindre rapidement la zone
-                            action = np.array([
-                                target_dir[0] * 1.0,  # Vitesse max
-                                target_dir[1] * 1.0,
-                                0.0
-                            ], dtype=np.float32)
-                            action = np.clip(action, -1, 1)
-                        else:
-                            action = env.action_space.sample() * 0.5
-                            
-                    elif distance_to_target > 10.0:
-                        # PHASE 2: APPROCHE GUIDÉE (zone intermédiaire)
-                        # Combinaison: Direction directe + Gradient + Teacher
-                        if len(teacher.observations) < 3:
-                            # Peu d'observations: navigation directe avec gradient
-                            grad_norm = np.sqrt(grad_x**2 + grad_y**2)
-                            if grad_norm > 1e-6:
-                                grad_dir = np.array([grad_x, grad_y]) / grad_norm
-                                target_dir = vec_to_target / distance_to_target
-                                combined = 0.6 * target_dir + 0.4 * grad_dir
-                            else:
-                                combined = vec_to_target / distance_to_target
-                        else:
-                            # Avec Teacher: combinaison intelligente
-                            next_x, next_y = teacher.select_next_point(
-                                current_pos[0],
-                                current_pos[1],
-                                gradient_x=grad_x,
-                                gradient_y=grad_y,
-                                target_position=tuple(target_position)
-                            )
-                            teacher_dir = np.array([next_x, next_y]) - current_pos
-                            teacher_norm = np.linalg.norm(teacher_dir)
-                            
-                            if teacher_norm > 0.1:
-                                teacher_dir = teacher_dir / teacher_norm
-                                target_dir = vec_to_target / distance_to_target
-                                grad_norm = np.sqrt(grad_x**2 + grad_y**2)
-                                
-                                if grad_norm > 1e-6:
-                                    grad_dir = np.array([grad_x, grad_y]) / grad_norm
-                                    # Priorité: Direct (45%) + Gradient (35%) + Teacher (20%)
-                                    combined = 0.45 * target_dir + 0.35 * grad_dir + 0.2 * teacher_dir
-                                else:
-                                    combined = 0.7 * target_dir + 0.3 * teacher_dir
-                            else:
-                                combined = vec_to_target / distance_to_target
-                        
-                        combined_norm = np.linalg.norm(combined)
+                    # Guidance Teacher pour le Student
+                    teacher_guidance = None
+                    teacher_dir_2d = np.array([0.0, 0.0])
+                    teacher_dir_norm = 0.0
+                    
+                    if teacher is not None and len(teacher.observations) >= 3:
+                        next_x, next_y = teacher.select_next_point(
+                            current_pos[0],
+                            current_pos[1],
+                            gradient_x=grad_x,
+                            gradient_y=grad_y
+                        )
+                        teacher_dir = np.array([next_x, next_y]) - current_pos
+                        teacher_dir_norm = np.linalg.norm(teacher_dir)
+                        if teacher_dir_norm > 0.1:
+                            teacher_dir_2d = teacher_dir[:2] / teacher_dir_norm
+                            teacher_guidance = teacher_dir_2d
+                    
+                    # Action Student avec guidance Teacher
+                    action_student = student.select_action(obs_state, training=True, teacher_guidance=teacher_guidance)
+                    action_student_2d = action_student[:2] if len(action_student) >= 2 else np.array([0.0, 0.0])
+                    
+                    # MÉLANGE ADAPTATIF : Combiner Teacher et Student selon les poids
+                    if teacher_dir_norm > 0.1 and np.linalg.norm(action_student_2d) > 0.1:
+                        # Mélange adaptatif des directions
+                        combined_dir = teacher_weight * teacher_dir_2d + student_weight * action_student_2d
+                        combined_norm = np.linalg.norm(combined_dir)
                         if combined_norm > 1e-6:
-                            combined = combined / combined_norm
-                            action = np.array([
-                                combined[0] * 0.9,  # Vitesse élevée
-                                combined[1] * 0.9,
-                                0.0
-                            ], dtype=np.float32)
+                            combined_dir = combined_dir / combined_norm
+                            action = np.append(combined_dir, 0.0)
                             action = np.clip(action, -1, 1)
                         else:
-                            action = env.action_space.sample() * 0.5
-                            
+                            action = np.clip(action_student, -1, 1)
+                    elif teacher_dir_norm > 0.1:
+                        # Utiliser uniquement Teacher si Student n'a pas de direction valide
+                        action = np.append(teacher_dir_2d * 0.8, 0.0)
+                        action = np.clip(action, -1, 1)
                     else:
-                        # PHASE 3: RECHERCHE LOCALE OPTIMISÉE (proche de la source, <10m)
-                        # Objectif: MAXIMISER les détections en balayant efficacement la zone
-                        
-                        # Utiliser le gradient pour suivre les zones à haute concentration
-                        grad_norm = np.sqrt(grad_x**2 + grad_y**2)
-                        
-                        if grad_norm > 1e-6:
-                            # Gradient fort: suivre le gradient pour maximiser les détections
-                            grad_dir = np.array([grad_x, grad_y]) / grad_norm
-                            
-                            # Si on a des détections récentes, augmenter le rayon de recherche
-                            if detection_count > 0:
-                                # Mouvement perpendiculaire au gradient pour balayer
-                                # Créer un mouvement en spirale autour de la source
-                                angle_to_source = np.arctan2(vec_to_target[1], vec_to_target[0])
-                                
-                                # Angle pour mouvement circulaire + suivi gradient
-                                search_angle = angle_to_source + (step * 0.3) % (2 * np.pi)
-                                
-                                # Combinaison: mouvement circulaire (40%) + gradient (40%) + vers source (20%)
-                                circular_dir = np.array([np.cos(search_angle), np.sin(search_angle)])
-                                combined = 0.4 * circular_dir + 0.4 * grad_dir + 0.2 * (vec_to_target / distance_to_target if distance_to_target > 1e-6 else np.array([0, 0]))
-                            else:
-                                # Pas encore de détections: suivre agressivement le gradient
-                                combined = 0.8 * grad_dir + 0.2 * (vec_to_target / distance_to_target if distance_to_target > 1e-6 else np.array([0, 0]))
-                            
-                            combined_norm = np.linalg.norm(combined)
-                            if combined_norm > 1e-6:
-                                combined = combined / combined_norm
-                                
-                                # Vitesse réduite proche de la source pour plus de mesures
-                                speed_factor = 0.6  # Plus lent pour plus de détections
-                                action = np.array([
-                                    combined[0] * speed_factor,
-                                    combined[1] * speed_factor,
-                                    0.0
-                                ], dtype=np.float32)
-                                action = np.clip(action, -1, 1)
-                            else:
-                                action = env.action_space.sample() * 0.4
-                        else:
-                            # Pas de gradient: mouvement circulaire autour de la source
-                            if distance_to_target > 1e-6:
-                                angle_to_source = np.arctan2(vec_to_target[1], vec_to_target[0])
-                                search_angle = angle_to_source + (step * 0.4) % (2 * np.pi)
-                                circular_dir = np.array([np.cos(search_angle), np.sin(search_angle)])
-                                
-                                # Mouvement tangentiel + léger mouvement vers la source
-                                tangent_dir = np.array([-np.sin(search_angle), np.cos(search_angle)])
-                                combined = 0.7 * tangent_dir + 0.3 * (vec_to_target / distance_to_target)
-                                combined_norm = np.linalg.norm(combined)
-                                if combined_norm > 1e-6:
-                                    combined = combined / combined_norm
-                                    action = np.array([
-                                        combined[0] * 0.5,
-                                        combined[1] * 0.5,
-                                        0.0
-                                    ], dtype=np.float32)
-                                    action = np.clip(action, -1, 1)
-                                else:
-                                    action = env.action_space.sample() * 0.4
-                            else:
-                                action = env.action_space.sample() * 0.3
+                        # Utiliser uniquement Student si Teacher n'a pas de direction valide
+                        action = np.clip(action_student, -1, 1)
                     
+                    # Step de l'environnement
                     obs, reward, terminated, truncated, info = env.step(action, teacher=teacher)
+                    
+                    # Mise à jour Student (apprentissage)
+                    next_obs = obs
+                    student.store_experience(obs_state, action, reward, next_obs, terminated or truncated)
+                    
+                    # Apprentissage périodique avec stratégie adaptative
+                    if student.step_count > student.config.learning_starts and student.step_count % 10 == 0:
+                        metrics = student.learn()
+                        # Recalculer la confiance après l'apprentissage
+                        if len(student.loss_history) > 10:
+                            recent_losses = student.loss_history[-10:]
+                            avg_loss = np.mean(recent_losses)
+                            student_confidence = max(0.0, min(1.0, 1.0 - (avg_loss / 0.5)))
+                            teacher_weight = 0.8 - (0.5 * student_confidence)
+                            student_weight = 0.2 + (0.5 * student_confidence)
+                    
+                    student.step_count += 1
+                    obs_state = next_obs
                     
                     # Mise à jour Teacher
                     if 'concentration' in info:
@@ -1459,40 +1448,14 @@ def generate_comparative_results(leak_x, leak_y, start_x, start_y, max_steps, n_
                             info['concentration']
                         )
                         
-                        # Détection optimisée : utiliser la détection classique comme Naïve (équitable)
+                        # Détection
                         concentration = info['concentration']
                         measured_conc = info.get('measured_concentration', concentration)
                         
-                        # STRATÉGIE DE DÉTECTION OPTIMISÉE POUR MAXIMISER LE TAUX
-                        # 1. Détection standard: mesurée > seuil
-                        # 2. Détection adaptative: si proche de la source, seuil réduit
-                        # 3. Détection progressive: suivre les tendances de concentration
-                        
-                        adaptive_threshold = sensor_config.detection_threshold
-                        
-                        # Réduction adaptative du seuil selon la distance
-                        if distance_to_source < 15.0:
-                            # Proche de la source: seuil réduit pour plus de détections
-                            adaptive_threshold = sensor_config.detection_threshold * 0.7
-                        elif distance_to_source < 25.0:
-                            # Zone intermédiaire: seuil modérément réduit
-                            adaptive_threshold = sensor_config.detection_threshold * 0.85
-                        
-                        # Détection avec seuil adaptatif
-                        is_detected = measured_conc > adaptive_threshold
-                        
-                        # Détection additionnelle: si la concentration réelle est élevée
-                        # (pour capturer les cas où le bruit masque la mesure)
-                        if not is_detected and distance_to_source < 10.0:
-                            # Très proche: utiliser aussi la concentration réelle
-                            if concentration > sensor_config.detection_threshold * 0.5:
-                                is_detected = True
-                        
-                        if is_detected:
+                        if info.get('detected', False) or measured_conc > sensor_config.detection_threshold:
                             if first_detection_step is None:
                                 first_detection_step = step
                             detection_count += 1
-                            last_detection_concentration = measured_conc
                         
                         # Détection améliorée pour métriques avancées
                         gradient = np.array([grad_x, grad_y, 0.0])
@@ -1512,9 +1475,41 @@ def generate_comparative_results(leak_x, leak_y, start_x, start_y, max_steps, n_
                     if terminated or truncated:
                         break
                 
-                # Statistiques finales HIGHLIGHT+
+                # Statistiques finales HIGHLIGHT+ avec Validateur GP
                 detector_stats = enhanced_detector.get_statistics()
-                estimated_pos, estimation_confidence = enhanced_detector.estimate_leak_position()
+                
+                # IMPORTANT : Utiliser estimate_all_leak_positions pour obtenir toutes les positions avec probabilité GP
+                all_estimated_positions = []
+                if hasattr(enhanced_detector, 'estimate_all_leak_positions'):
+                    try:
+                        all_estimated_positions = enhanced_detector.estimate_all_leak_positions(
+                            min_probability=0.75,
+                            min_distance=10.0
+                        )
+                        if len(all_estimated_positions) > 5:
+                            all_estimated_positions = all_estimated_positions[:5]
+                    except Exception as e:
+                        # Fallback sur estimate_leak_position
+                        temp_pos, temp_conf = enhanced_detector.estimate_leak_position()
+                        if temp_pos is not None:
+                            all_estimated_positions = [(temp_pos, temp_conf)]
+                else:
+                    # Fallback si méthode non disponible
+                    temp_pos, temp_conf = enhanced_detector.estimate_leak_position()
+                    if temp_pos is not None:
+                        all_estimated_positions = [(temp_pos, temp_conf)]
+                
+                # Prendre la meilleure position (probabilité GP la plus élevée)
+                if all_estimated_positions:
+                    estimated_pos, estimation_confidence = all_estimated_positions[0]
+                    estimation_confidence = float(np.clip(estimation_confidence, 0.0, 1.0))
+                else:
+                    estimated_pos, estimation_confidence = enhanced_detector.estimate_leak_position()
+                    if estimated_pos is not None:
+                        estimation_confidence = float(np.clip(estimation_confidence, 0.0, 1.0))
+                    else:
+                        estimation_confidence = 0.0
+                
                 final_distance = np.linalg.norm(np.array([env.drone_position[0], env.drone_position[1]]) - np.array(true_leak_pos))
                 
                 # Calcul du temps de détection
@@ -1529,8 +1524,9 @@ def generate_comparative_results(leak_x, leak_y, start_x, start_y, max_steps, n_
                     'trajectory': np.array(trajectory_highlight),
                     'avg_confidence': detector_stats.get('avg_confidence', 0.0),
                     'estimated_position': estimated_pos.tolist() if estimated_pos is not None else None,
-                    'estimation_confidence': estimation_confidence if estimated_pos is not None else 0.0,
-                    'gp_validator_used': True  # Indicateur d'utilisation du validateur GP
+                    'estimation_confidence': estimation_confidence,  # Probabilité GP
+                    'gp_validator_used': True,  # Indicateur d'utilisation du validateur GP
+                    'all_estimated_positions': [(pos.tolist() if isinstance(pos, np.ndarray) else pos, float(np.clip(conf, 0.0, 1.0))) for pos, conf in all_estimated_positions] if all_estimated_positions else []  # Toutes les positions détectées
                 })
                 
                 progress_bar.progress((run + 1) / n_runs)
@@ -1538,6 +1534,20 @@ def generate_comparative_results(leak_x, leak_y, start_x, start_y, max_steps, n_
             # Calcul des métriques moyennes
             naive_times = [r['detection_time'] for r in results_naive_list if r['detection_time'] is not None]
             highlight_times = [r['detection_time'] for r in results_highlight_list if r['detection_time'] is not None]
+            
+            # Calculer l'erreur de localisation moyenne pour tous les runs
+            localization_errors = []
+            for r in results_highlight_list:
+                if 'estimated_position' in r and r['estimated_position'] is not None:
+                    est_pos = r['estimated_position']
+                    if isinstance(est_pos, (list, tuple, np.ndarray)) and len(est_pos) >= 2:
+                        true_pos = (leak_x, leak_y)
+                        error = np.linalg.norm(np.array(est_pos[:2]) - np.array(true_pos[:2]))
+                        localization_errors.append(error)
+            
+            # Calculer la confiance moyenne (toujours calculer, même si 0)
+            all_confidence_values = [r.get('avg_confidence', 0.0) for r in results_highlight_list]
+            avg_confidence = np.mean(all_confidence_values) if all_confidence_values else 0.0
             
             metrics = {
                 'naive': {
@@ -1553,7 +1563,9 @@ def generate_comparative_results(leak_x, leak_y, start_x, start_y, max_steps, n_
                     'energy_consumed': np.mean([r['energy_consumed'] for r in results_highlight_list]),
                     'n_detections': np.mean([r['n_detections'] for r in results_highlight_list]),
                     'final_distance': np.mean([r['final_distance'] for r in results_highlight_list]),
-                    'avg_confidence': np.mean([r['avg_confidence'] for r in results_highlight_list])
+                    'avg_confidence': avg_confidence,
+                    'localization_error': np.mean(localization_errors) if localization_errors else None,
+                    'localization_precision': "Excellente" if (localization_errors and np.mean(localization_errors) <= 2.0) else ("Bonne" if (localization_errors and np.mean(localization_errors) <= 5.0) else ("Acceptable" if localization_errors else None))
                 }
             }
             
@@ -1573,10 +1585,12 @@ def generate_comparative_results(leak_x, leak_y, start_x, start_y, max_steps, n_
             if metrics['naive']['detection_time'] and metrics['highlight']['detection_time']:
                 metrics['gains']['time_reduction'] = ((metrics['naive']['detection_time'] - metrics['highlight']['detection_time']) / metrics['naive']['detection_time']) * 100
             
-            # Génération des visualisations dynamiques - EN MÉMOIRE
+            # Génération des visualisations dynamiques - EN MÉMOIRE (avec timestamp pour forcer la régénération)
             st.info("Generation des graphiques comparatifs en temps reel...")
             chart_buffer = generate_comparative_charts(metrics, return_buffer=True)
+            # Ajouter un timestamp pour forcer la régénération à chaque exécution
             st.session_state['comparative_charts_buffer'] = chart_buffer
+            st.session_state['comparative_charts_timestamp'] = datetime.now().timestamp()
             
             # Génération des trajectoires (dernier run pour visualisation) - EN MÉMOIRE
             st.info("Generation des trajectoires comparatives en temps reel...")
@@ -1595,7 +1609,7 @@ def generate_comparative_results(leak_x, leak_y, start_x, start_y, max_steps, n_
                 return_buffer=True
             )
             
-            # Stocker les trajectoires pour affichage
+            # Stocker les trajectoires pour affichage (avec timestamp pour forcer la régénération)
             st.session_state['simple_trajectories'] = {
                 'naive': results_naive_list[-1]['trajectory'],
                 'highlight': results_highlight_list[-1]['trajectory'],
@@ -1603,6 +1617,7 @@ def generate_comparative_results(leak_x, leak_y, start_x, start_y, max_steps, n_
                 'all_leak_positions': all_leak_positions_for_viz
             }
             st.session_state['trajectory_buffer'] = traj_buffer
+            st.session_state['trajectory_timestamp'] = datetime.now().timestamp()
             
             # Rapport - Générer en mémoire
             st.info("Generation du rapport en temps reel...")
@@ -1617,6 +1632,16 @@ def generate_comparative_results(leak_x, leak_y, start_x, start_y, max_steps, n_
                     metrics['highlight']['estimated_position'] = last_result['estimated_position']
                     metrics['highlight']['estimation_confidence'] = last_result.get('estimation_confidence', 0.0)
                     metrics['highlight']['gp_validator_used'] = last_result.get('gp_validator_used', False)
+                
+                # Stocker toutes les positions détectées
+                if 'all_estimated_positions' in last_result and last_result['all_estimated_positions']:
+                    metrics['highlight']['all_estimated_positions'] = last_result['all_estimated_positions']
+                else:
+                    metrics['highlight']['all_estimated_positions'] = []
+                
+                # Les métriques de localisation et de confiance sont déjà calculées dans les métriques moyennes ci-dessus
+                # Calculer le temps moyen de détection (déjà fait dans metrics['highlight']['detection_time'])
+                metrics['highlight']['avg_detection_time'] = metrics['highlight'].get('detection_time')
             
             st.session_state['simple_comparative_metrics'] = metrics
             st.session_state['simple_comparative_config'] = {
@@ -1915,23 +1940,15 @@ def display_comparative_results():
         
         with col1:
             highlight_rate = metrics['highlight']['detection_rate']
-            # Ajustement pour refléter les résultats réels de l'analyse (85-95%)
-            # Si le taux est trop bas, on l'ajuste vers la fourchette réelle
-            if highlight_rate < 80:
-                # Afficher la valeur réelle mais avec note de référence
-                display_rate = highlight_rate
-                note = "Reference analyse: 85-95%"
-            else:
-                display_rate = highlight_rate
-                note = None
+            gain_rate = metrics['gains']['detection_rate'] if metrics['gains']['detection_rate'] else 0.0
+            delta_text = f"{gain_rate:+.1f}% vs Naïve" if gain_rate != 0 else None
             st.metric(
                 "Taux de Détection HIGHLIGHT+",
-                f"{display_rate:.1f}%",
-                delta=f"+{metrics['gains']['detection_rate']:.1f}% vs Naïve" if metrics['gains']['detection_rate'] else None,
-                delta_color="normal"
+                f"{highlight_rate:.1f}%",
+                delta=delta_text,
+                delta_color="normal" if gain_rate >= 0 else "inverse"
             )
-            if note:
-                st.caption(note)
+            st.caption("Reference analyse: 85-95%")
         
         with col2:
             energy_savings = -metrics['gains']['energy_savings'] if metrics['gains']['energy_savings'] else 0
@@ -1946,24 +1963,77 @@ def display_comparative_results():
             n_det = metrics['gains']['detection_improvement'] if metrics['gains']['detection_improvement'] else 0
             st.metric(
                 "Amélioration Détections",
-                f"+{n_det:.1f}%",
+                f"{n_det:+.1f}%",
                 delta=f"{metrics['highlight']['n_detections']:.1f} détections",
-                delta_color="normal"
+                delta_color="normal" if n_det >= 0 else "inverse"
             )
         
         with col4:
             dist = metrics['highlight']['final_distance']
+            naive_dist = metrics['naive']['final_distance']
+            dist_improvement = naive_dist - dist
             st.metric(
                 "Distance Finale",
                 f"{dist:.1f} m",
-                delta=f"-{metrics['naive']['final_distance'] - dist:.1f} m vs Naïve",
+                delta=f"{dist_improvement:+.1f} m vs Naïve",
                 delta_color="inverse"
             )
         
-        # Affichage de la position estimée GP si disponible
+        # Métriques supplémentaires dynamiques
+        st.markdown("---")
+        st.markdown('<div class="subsection-header">Métriques Supplémentaires</div>', unsafe_allow_html=True)
+        
+        col5, col6, col7 = st.columns(3)
+        
+        with col5:
+            # Temps de détection
+            highlight_time = metrics['highlight'].get('avg_detection_time') or metrics['highlight'].get('detection_time')
+            naive_time = metrics['naive'].get('detection_time')
+            if highlight_time:
+                time_reduction = metrics['gains'].get('time_reduction', 0)
+                st.metric(
+                    "Temps de Détection",
+                    f"{highlight_time:.1f} s",
+                    delta=f"{time_reduction:+.1f}% vs Naïve" if time_reduction else None,
+                    delta_color="inverse" if time_reduction and time_reduction > 0 else "normal"
+                )
+            else:
+                st.metric("Temps de Détection", "N/A")
+        
+        with col6:
+            # Précision de localisation
+            localization_error = metrics['highlight'].get('localization_error')
+            if localization_error is not None:
+                precision_status = metrics['highlight'].get('localization_precision', 'Acceptable')
+                st.metric(
+                    "Précision Localisation",
+                    f"{localization_error:.2f} m",
+                    delta=precision_status,
+                    delta_color="normal" if localization_error <= 2.0 else ("normal" if localization_error <= 5.0 else "off")
+                )
+            else:
+                st.metric("Précision Localisation", "N/A")
+        
+        with col7:
+            # Confiance moyenne
+            avg_conf = metrics['highlight'].get('avg_confidence', 0.0)
+            # Vérifier si la valeur existe et est valide (pas None et > 0)
+            if avg_conf is not None and avg_conf > 0:
+                conf_status = "Élevée" if avg_conf >= 0.7 else ("Moyenne" if avg_conf >= 0.4 else "Faible")
+                st.metric(
+                    "Confiance Moyenne",
+                    f"{avg_conf:.1%}",
+                    delta=conf_status,
+                    delta_color="normal" if avg_conf >= 0.7 else ("normal" if avg_conf >= 0.4 else "off")
+                )
+            else:
+                # Afficher 0% au lieu de N/A si la valeur existe mais est 0
+                st.metric("Confiance Moyenne", f"{avg_conf:.1%}" if avg_conf is not None else "N/A")
+        
+        # Affichage détaillé de la position estimée GP si disponible
         if 'estimated_position' in metrics['highlight'] and metrics['highlight']['estimated_position'] is not None:
             st.markdown("---")
-            st.markdown('<div class="subsection-header">Position Estimée (GP Validator)</div>', unsafe_allow_html=True)
+            st.markdown('<div class="subsection-header">Détails de Localisation (GP Validator)</div>', unsafe_allow_html=True)
             
             est_pos = metrics['highlight']['estimated_position']
             est_conf = metrics['highlight'].get('estimation_confidence', 0.0)
@@ -1978,21 +2048,80 @@ def display_comparative_results():
             if len(est_pos) >= 2 and len(true_pos) >= 2:
                 error = np.linalg.norm(np.array(est_pos[:2]) - np.array(true_pos[:2]))
                 
-                est_col1, est_col2, est_col3 = st.columns(3)
+                # Calculer l'angle de l'erreur
+                error_vec = np.array(est_pos[:2]) - np.array(true_pos[:2])
+                error_angle = np.degrees(np.arctan2(error_vec[1], error_vec[0]))
+                
+                est_col1, est_col2, est_col3, est_col4 = st.columns(4)
                 with est_col1:
-                    st.markdown(f"**Position Estimée (GP):** ({est_pos[0]:.2f}, {est_pos[1]:.2f}) m")
-                    st.markdown(f"**Confiance GP:** {est_conf:.1%}")
+                    st.markdown("**Position Estimée (GP)**")
+                    st.markdown(f"({est_pos[0]:.2f}, {est_pos[1]:.2f}) m")
+                    st.markdown(f"**Probabilité GP:** {est_conf:.1%}")
                     if est_conf >= 0.85:
-                        st.markdown('<span class="status-badge status-success">Confiance Élevée</span>', unsafe_allow_html=True)
+                        st.markdown('<span class="status-badge status-success">Très Élevée</span>', unsafe_allow_html=True)
+                    elif est_conf >= 0.70:
+                        st.markdown('<span class="status-badge status-info">Élevée</span>', unsafe_allow_html=True)
+                    elif est_conf >= 0.50:
+                        st.markdown('<span class="status-badge status-warning">Moyenne</span>', unsafe_allow_html=True)
+                
                 with est_col2:
-                    st.markdown(f"**Position Réelle:** ({true_pos[0]:.2f}, {true_pos[1]:.2f}) m")
-                    st.caption("(Uniquement pour validation/comparaison)")
+                    st.markdown("**Position Réelle**")
+                    st.markdown(f"({true_pos[0]:.2f}, {true_pos[1]:.2f}) m")
+                    st.caption("(Uniquement pour validation)")
+                
                 with est_col3:
-                    st.markdown(f"**Erreur:** {error:.2f} m")
+                    st.markdown("**Erreur de Localisation**")
+                    st.markdown(f"**Distance:** {error:.2f} m")
+                    st.markdown(f"**Angle:** {error_angle:.1f}°")
                     if error <= 2.0:
-                        st.markdown('<span class="status-badge status-success">Excellente Précision</span>', unsafe_allow_html=True)
+                        st.markdown('<span class="status-badge status-success">Excellente</span>', unsafe_allow_html=True)
                     elif error <= 5.0:
-                        st.markdown('<span class="status-badge status-info">Bonne Précision</span>', unsafe_allow_html=True)
+                        st.markdown('<span class="status-badge status-info">Bonne</span>', unsafe_allow_html=True)
+                    elif error <= 10.0:
+                        st.markdown('<span class="status-badge status-warning">Acceptable</span>', unsafe_allow_html=True)
+                    else:
+                        st.markdown('<span class="status-badge status-error">À améliorer</span>', unsafe_allow_html=True)
+                
+                with est_col4:
+                    st.markdown("**Performance**")
+                    # Calculer le score de précision (0-100)
+                    precision_score = max(0, 100 - (error * 10))  # -10 points par mètre d'erreur
+                    st.markdown(f"**Score Précision:** {precision_score:.1f}/100")
+                    if precision_score >= 80:
+                        st.markdown('<span class="status-badge status-success">Excellent</span>', unsafe_allow_html=True)
+                    elif precision_score >= 60:
+                        st.markdown('<span class="status-badge status-info">Bon</span>', unsafe_allow_html=True)
+                    elif precision_score >= 40:
+                        st.markdown('<span class="status-badge status-warning">Acceptable</span>', unsafe_allow_html=True)
+                
+                # Afficher toutes les positions détectées si disponibles
+                all_positions = metrics['highlight'].get('all_estimated_positions', [])
+                if len(all_positions) > 1:
+                    st.markdown("---")
+                    st.markdown("**Toutes les Positions Détectées (Carte GP)**")
+                    
+                    # Créer un DataFrame pour l'affichage
+                    positions_data = []
+                    config = st.session_state.get('simple_comparative_config', {})
+                    true_pos = np.array([config.get('leak_x', 0), config.get('leak_y', 0)])
+                    
+                    for i, (pos, conf) in enumerate(all_positions):
+                        if isinstance(pos, (list, tuple, np.ndarray)) and len(pos) >= 2:
+                            pos_array = np.array(pos[:2])
+                            error = np.linalg.norm(pos_array - true_pos)
+                            positions_data.append({
+                                'ID': i + 1,
+                                'Position X (m)': f"{pos_array[0]:.2f}",
+                                'Position Y (m)': f"{pos_array[1]:.2f}",
+                                'Probabilité GP': f"{conf:.1%}",
+                                'Erreur (m)': f"{error:.2f}",
+                                'Statut': "Excellente" if error <= 2.0 else ("Bonne" if error <= 5.0 else ("Acceptable" if error <= 10.0 else "À améliorer"))
+                            })
+                    
+                    if positions_data:
+                        df_positions = pd.DataFrame(positions_data)
+                        st.dataframe(df_positions, use_container_width=True, hide_index=True)
+                        st.caption("Les positions sont triées par probabilité GP décroissante (meilleure estimation en premier).")
     
     # Visualisations - Générées en temps réel à partir des données réelles
     st.markdown('<div class="subsection-header">Visualisations Comparatives (Generees en Temps Reel)</div>', unsafe_allow_html=True)
@@ -2001,22 +2130,26 @@ def display_comparative_results():
     if 'simple_comparative_metrics' in st.session_state:
         metrics = st.session_state['simple_comparative_metrics']
         
-        # Générer et afficher les graphiques de performance
+        # Générer et afficher les graphiques de performance (toujours régénérer pour être à jour)
         if 'naive' in metrics and 'highlight' in metrics:
             st.markdown("**Graphiques de Performance**")
+            # Toujours régénérer les graphiques pour être à jour avec les dernières données
             chart_buffer = generate_comparative_charts(metrics, return_buffer=True)
             st.image(chart_buffer, use_container_width=True)
             st.caption("Analyse comparative des métriques de performance - Généré en temps réel à partir de vos simulations")
         
-        # Générer et afficher les trajectoires comparatives
+        # Générer et afficher les trajectoires comparatives (toujours régénérer pour être à jour)
         if 'simple_trajectories' in st.session_state:
             trajectories = st.session_state['simple_trajectories']
             if 'naive' in trajectories and 'highlight' in trajectories and 'true_leak_pos' in trajectories:
                 st.markdown("**Trajectoires Comparatives**")
+                # Toujours régénérer les trajectoires pour être à jour avec les dernières données
+                all_leak_positions = trajectories.get('all_leak_positions', None)
                 traj_buffer = generate_trajectory_comparison(
                     trajectories['naive'],
                     trajectories['highlight'],
                     trajectories['true_leak_pos'],
+                    all_leak_positions=all_leak_positions,
                     return_buffer=True
                 )
                 st.image(traj_buffer, use_container_width=True)
@@ -2057,76 +2190,16 @@ def display_performance_report():
     else:
         st.info("Le rapport sera genere automatiquement apres la simulation comparative.")
 
-def show_results_tab():
-    """Onglet de résultats"""
-    st.markdown('<div class="section-header">Résultats et Métriques</div>', unsafe_allow_html=True)
-    
-    if not st.session_state.simulation_results:
-        st.info("Aucun résultat disponible. Lancez d'abord une simulation.")
-        return
-    
-    results = st.session_state.simulation_results
-    
-    # Afficher toutes les fuites détectées si disponibles (mode multi-fuites)
-    all_detected_leaks = st.session_state.get('detected_leaks', [])
-    if all_detected_leaks:
-        st.markdown("---")
-        st.markdown('<div class="subsection-header">Fuite(s) Détectée(s) (Mode Multi-Fuites)</div>', unsafe_allow_html=True)
-        st.success(f"**{len(all_detected_leaks)} point(s) de fuite détecté(s)**")
-        
-        # IMPORTANT : Trier les positions par probabilité GP décroissante (meilleure en premier)
-        # La probabilité GP est la confiance stockée dans detected_leaks
-        all_detected_leaks_sorted = sorted(all_detected_leaks, key=lambda x: x.get('confidence', 0.0), reverse=True)
-        
-        # Créer un DataFrame pour affichage avec positions triées
-        leaks_df = pd.DataFrame([
-            {
-                'ID': i+1,
-                'Position X (m)': f"{leak['position'][0]:.2f}",
-                'Position Y (m)': f"{leak['position'][1]:.2f}",
-                'Probabilité GP': f"{leak['confidence']:.1%}",  # Probabilité GP, pas confiance de détection
-                'Étape': leak['step'],
-                'Temps (s)': f"{leak['time']:.1f}"
-            }
-            for i, leak in enumerate(all_detected_leaks_sorted)
-        ])
-        st.dataframe(leaks_df, use_container_width=True, hide_index=True)
-        st.info("**Note** : En mode multi-fuites, le système continue la recherche après chaque détection pour identifier toutes les fuites.")
-    
-    display_performance_metrics(results)
-    
-    if 'trajectory' in results and results['trajectory']:
-        display_trajectory_visualization(results)
-
 def display_performance_metrics(results):
     """Affiche les métriques de performance de manière professionnelle"""
     st.markdown('<div class="subsection-header">Indicateurs de Performance</div>', unsafe_allow_html=True)
     
-    # Métriques de base
-    col1, col2, col3, col4 = st.columns(4)
+    # Métriques de base (3 colonnes - statistiques pertinentes uniquement)
+    col1, col2, col3 = st.columns(3)
     
     with col1:
         detections = results.get('n_detections', 0)
-        rate = results.get('detection_rate', 0)
-        # Calcul du taux de bonne détection (mission success rate)
-        if 'performance_metrics' in results and results['performance_metrics']:
-            metrics = results['performance_metrics']
-            mission_success_rate = 100.0 if metrics.mission_success else 0.0
-            # Si on a des détections valides dans la tolérance
-            if metrics.localization_accuracy and metrics.localization_accuracy.is_within_tolerance:
-                mission_success_rate = 100.0
-            elif metrics.n_detections > 0:
-                # Estimation basée sur la précision
-                if metrics.localization_accuracy:
-                    error_ratio = metrics.localization_accuracy.error_distance / metrics.localization_accuracy.tolerance_radius
-                    mission_success_rate = max(0, 100 * (1 - min(1, error_ratio)))
-                else:
-                    mission_success_rate = 85.0  # Valeur par défaut basée sur l'analyse
-            else:
-                mission_success_rate = 0.0
-            st.metric("Taux de Bonne Détection", f"{mission_success_rate:.1f}%", f"{detections} détections")
-        else:
-            st.metric("Détections", f"{detections}", f"{rate:.1f}%")
+        st.metric("Détections", f"{detections}", "Nombre total")
         if detections > 0:
             st.markdown('<span class="status-badge status-success">Détection Réussie</span>', unsafe_allow_html=True)
         else:
@@ -2146,10 +2219,6 @@ def display_performance_metrics(results):
     with col3:
         time_taken = results.get('total_time', 0)
         st.metric("Durée de Mission", f"{time_taken:.1f} s")
-    
-    with col4:
-        max_conc = results.get('max_concentration', 0)
-        st.metric("Concentration Maximale", f"{max_conc:.4f} kg/m³")
     
     # Métriques de validation (si disponibles)
     if 'performance_metrics' in results and results['performance_metrics']:
@@ -2221,17 +2290,14 @@ def display_performance_metrics(results):
             st.metric("Taux de Succès Mission", f"{success_rate:.0f}%", mission_status)
             if metrics.convergence_time:
                 st.caption(f"Convergence: {metrics.convergence_time:.1f}s")
-            # Référence aux résultats de l'analyse
-            if success_rate >= 85:
-                st.caption("Conforme: 85-90% (analyse)")
         
-        # Métriques améliorées du détecteur
+        # Métriques améliorées du détecteur (statistiques pertinentes uniquement)
         if 'detector_stats' in results and results['detector_stats']:
             st.markdown("---")
             st.markdown('<div class="subsection-header">Statistiques du Detecteur Ameliore</div>', unsafe_allow_html=True)
             
             det_stats = results['detector_stats']
-            det_col1, det_col2, det_col3, det_col4 = st.columns(4)
+            det_col1, det_col2 = st.columns(2)
             
             with det_col1:
                 avg_conf = det_stats.get('avg_confidence', 0)
@@ -2250,34 +2316,26 @@ def display_performance_metrics(results):
                 if total_det > 0:
                     validation_rate = valid_det / total_det
                     st.caption(f"Taux: {validation_rate:.1%}")
-            
-            with det_col3:
-                min_dist = det_stats.get('min_distance', float('inf'))
-                if min_dist < float('inf'):
-                    st.metric("Distance Minimale", f"{min_dist:.1f} m")
-                    if min_dist < 10:
-                        st.markdown('<span class="status-badge status-success">Très Proche</span>', unsafe_allow_html=True)
-                    elif min_dist < 20:
-                        st.markdown('<span class="status-badge status-info">Proche</span>', unsafe_allow_html=True)
-                else:
-                    st.metric("Distance Minimale", "N/A")
-            
-            with det_col4:
-                conv_step = det_stats.get('convergence_step')
-                if conv_step:
-                    conv_time = conv_step * (results.get('total_time', 0) / results.get('n_detections', 1))
-                    st.metric("Convergence", f"Étape {conv_step}", f"{conv_time:.1f}s")
-                    st.markdown('<span class="status-badge status-success">Convergé</span>', unsafe_allow_html=True)
-                else:
-                    st.metric("Convergence", "Non atteinte")
         
         # Estimation améliorée de position (GP Validator)
         if 'estimated_position' in results and results['estimated_position']:
             st.markdown("---")
             st.markdown('<div class="subsection-header">Position Estimée (GP Validator)</div>', unsafe_allow_html=True)
             
-            est_pos = np.array(results['estimated_position'])
-            est_conf = results.get('estimation_confidence', 0)
+            # IMPORTANT : Utiliser la meilleure position de all_detected_leaks_sorted (probabilité GP la plus élevée)
+            # pour assurer la cohérence avec "RÉSULTATS DE LA DÉTECTION"
+            all_detected = st.session_state.get('detected_leaks', [])
+            if all_detected:
+                # Trier par probabilité GP décroissante (meilleure en premier)
+                all_detected_sorted = sorted(all_detected, key=lambda x: x.get('confidence', 0.0), reverse=True)
+                best_detected = all_detected_sorted[0]  # Meilleure position (probabilité GP la plus élevée)
+                est_pos = np.array(best_detected['position'])
+                est_conf = float(np.clip(best_detected.get('confidence', 0.0), 0.0, 1.0))
+            else:
+                # Fallback : utiliser estimated_position de results
+                est_pos = np.array(results['estimated_position'])
+                est_conf = results.get('estimation_confidence', 0)
+            
             true_pos = np.array([results['performance_metrics'].localization_accuracy.true_position 
                                if results.get('performance_metrics') and results['performance_metrics'].localization_accuracy 
                                else [0, 0]])
@@ -2442,76 +2500,6 @@ def display_performance_metrics(results):
                     improvement_pct = ((error_dist - metrics.localization_accuracy.tolerance_radius) / error_dist) * 100
                     st.caption(f"Reduire de {improvement_pct:.0f}% pour atteindre la tolerance")
         
-        # Scores détaillés
-        st.markdown("---")
-        st.markdown('<div class="subsection-header">Scores de Performance Detailles</div>', unsafe_allow_html=True)
-        score_col1, score_col2, score_col3 = st.columns(3)
-        
-        with score_col1:
-            st.metric("Score Détection", f"{metrics.detection_score:.1f}/100")
-            progress = min(100, metrics.detection_score)
-            st.progress(progress / 100)
-            # Référence analyse
-            if metrics.detection_score >= 80:
-                st.caption("Excellent (reference: 80-100)")
-            elif metrics.detection_score >= 60:
-                st.caption("Bon (reference: 60-79)")
-        
-        with score_col2:
-            st.metric("Score Localisation", f"{metrics.localization_score:.1f}/100")
-            progress = min(100, metrics.localization_score)
-            st.progress(progress / 100)
-            # Référence analyse: précision 1.8-2.1m
-            if metrics.localization_score >= 80:
-                st.caption("Excellent (reference: <2m erreur)")
-            elif metrics.localization_score >= 60:
-                st.caption("Bon (reference: <10m tolerance)")
-        
-        with score_col3:
-            if metrics.energy_per_detection:
-                efficiency_score = min(100, 100 * (100 / max(1, metrics.energy_per_detection)))
-                st.metric("Score Efficacité", f"{efficiency_score:.1f}/100")
-                progress = min(100, efficiency_score)
-                st.progress(progress / 100)
-                st.caption("Ideal: <100 J/detection")
-        
-        # Section informative avec résultats de référence de l'analyse
-        st.markdown("---")
-        st.markdown('<div class="subsection-header">References de Performance (Analyse IA)</div>', unsafe_allow_html=True)
-        
-        ref_col1, ref_col2, ref_col3, ref_col4 = st.columns(4)
-        
-        with ref_col1:
-            st.info("""
-            **Taux de Détection**
-            - Teacher (GP): 85-92%
-            - Student (RL): 92-95%
-            - Baseline: 12-15%
-            """)
-        
-        with ref_col2:
-            st.info("""
-            **Précision Localisation**
-            - Erreur moyenne: 1.8-2.1m
-            - Taux de succès: 85-90%
-            - Tolérance: 10m
-            """)
-        
-        with ref_col3:
-            st.info("""
-            **Temps de Détection**
-            - Première détection: 0.8-12s
-            - Convergence: 10-45s
-            - Amélioration: -93% vs naïve
-            """)
-        
-        with ref_col4:
-            st.info("""
-            **Score Global**
-            - Excellent: 80-100/100
-            - Bon: 60-79/100
-            - Acceptable: 40-59/100
-            """)
 
 def display_trajectory_visualization(results):
     """Visualise la trajectoire du drone avec validation de position"""
@@ -2726,262 +2714,6 @@ def display_trajectory_visualization(results):
     )
     
     st.plotly_chart(fig, use_container_width=True)
-
-def display_learning_metrics():
-    """Affiche les métriques d'apprentissage"""
-    df = pd.DataFrame(st.session_state.learning_history)
-    
-    col1, col2, col3, col4 = st.columns(4)
-    
-    with col1:
-        convergence_step = df[df['loss_std'] < 0.01]['step'].iloc[0] if not df[df['loss_std'] < 0.01].empty else "N/A"
-        st.metric("Étape de Convergence", f"{convergence_step}")
-    
-    with col2:
-        first_detection = df[df['detection'] == True]['step'].iloc[0] if not df[df['detection'] == True].empty else "N/A"
-        st.metric("Première Détection", f"Étape {first_detection}")
-    
-    with col3:
-        detection_rate = df['detection'].mean() * 100
-        st.metric("Taux de Détection", f"{detection_rate:.1f}%")
-    
-    with col4:
-        learning_efficiency = calculate_learning_efficiency(df)
-        st.metric("Efficacité d'Apprentissage", f"{learning_efficiency:.3f}")
-    
-    # Graphiques d'apprentissage
-    fig = make_subplots(
-        rows=2, cols=2,
-        subplot_titles=('Évolution des Pertes', 'Évolution des Récompenses', 
-                      'Historique des Détections', 'Taux de Détection par Époque'),
-        specs=[[{"secondary_y": False}, {"secondary_y": False}],
-               [{"secondary_y": False}, {"secondary_y": False}]]
-    )
-    
-    # Graphique 1: Pertes
-    fig.add_trace(
-        go.Scatter(x=df['step'], y=df['total_loss'], name='Perte Totale', 
-                  line=dict(color='#0f3460', width=2)),
-        row=1, col=1
-    )
-    
-    # Graphique 2: Récompenses
-    fig.add_trace(
-        go.Scatter(x=df['step'], y=df['reward'], name='Récompense', 
-                  line=dict(color='#28a745', width=2)),
-        row=1, col=2
-    )
-    
-    # Graphique 3: Détections
-    detections = df[df['detection'] == True]
-    if not detections.empty:
-        fig.add_trace(
-            go.Scatter(x=detections['step'], y=detections['concentration'], 
-                      mode='markers', name='Détections', 
-                      marker=dict(color='#dc3545', size=8)),
-            row=2, col=1
-        )
-    
-    # Graphique 4: Taux de détection par époque
-    if len(df) > 100:
-        detection_by_epoch = []
-        steps_by_epoch = []
-        for i in range(0, len(df), 100):
-            epoch_data = df.iloc[i:i+100]
-            detection_rate = epoch_data['detection'].mean()
-            detection_by_epoch.append(detection_rate)
-            steps_by_epoch.append(epoch_data['step'].iloc[-1])
-        
-        fig.add_trace(
-            go.Scatter(x=steps_by_epoch, y=detection_by_epoch, 
-                      mode='lines+markers', name='Taux de Détection', 
-                      line=dict(color='#ffc107')),
-            row=2, col=2
-        )
-    
-    fig.update_layout(height=700, showlegend=False, template='plotly_white')
-    st.plotly_chart(fig, use_container_width=True)
-
-def display_test_results():
-    """Affiche les résultats des tests avec informations détaillées"""
-    if not st.session_state.test_results or len(st.session_state.test_results) == 0:
-        st.info("Aucun résultat de test disponible. Lancez d'abord les tests de robustesse.")
-        return
-    
-    df_results = pd.DataFrame(st.session_state.test_results)
-    
-    # Note sur le validateur GP
-    st.info("""
-    **Tests de Robustesse** : Les tests utilisent le **Validateur GP** pour estimer la position de fuite 
-    avec une probabilité de confiance. La précision affichée est basée sur l'estimation GP (Processus Gaussiens).
-    Les tests peuvent être effectués avec différents modes (Mode Simple, Mode Teacher, Mode Teacher-Student).
-    """)
-    
-    # Résumé global en haut
-    st.markdown("---")
-    st.markdown("### Résumé Global des Tests")
-    
-    col_sum1, col_sum2, col_sum3, col_sum4, col_sum5 = st.columns(5)
-    
-    with col_sum1:
-        avg_precision = pd.to_numeric(df_results['precision'].str.replace('%', ''), errors='coerce').mean()
-        st.metric("Précision Moyenne", f"{avg_precision:.1f}%")
-    
-    with col_sum2:
-        avg_detections = pd.to_numeric(df_results['detections'], errors='coerce').mean()
-        st.metric("Détections Moyennes", f"{avg_detections:.1f}")
-    
-    with col_sum3:
-        success_count = len(df_results[df_results['status'] == 'Reussi'])
-        success_rate = (success_count / len(df_results)) * 100 if len(df_results) > 0 else 0
-        st.metric("Taux de Réussite", f"{success_rate:.1f}%", f"{success_count}/{len(df_results)}")
-    
-    with col_sum4:
-        # Calculer la confiance GP moyenne
-        gp_conf_values = pd.to_numeric(df_results['gp_confidence'].str.replace('%', ''), errors='coerce')
-        avg_gp_conf = gp_conf_values.mean() if not gp_conf_values.isna().all() else 0
-        st.metric("Confiance GP Moyenne", f"{avg_gp_conf:.1f}%")
-    
-    with col_sum5:
-        # Calculer l'erreur moyenne
-        error_values = pd.to_numeric(df_results['error_distance'].str.replace('m', '').str.replace('N/A', 'nan'), errors='coerce')
-        avg_error = error_values.mean() if not error_values.isna().all() else None
-        if avg_error is not None and not np.isnan(avg_error):
-            st.metric("Erreur Moyenne", f"{avg_error:.2f}m")
-        else:
-            st.metric("Erreur Moyenne", "N/A")
-    
-    # Tableau détaillé avec toutes les informations
-    st.markdown("---")
-    st.markdown("### Détails par Position")
-    
-    # Réorganiser les colonnes pour meilleure lisibilité
-    display_columns = ['position', 'mode', 'status', 'precision', 'error_distance', 'gp_confidence', 
-                      'detections', 'detection_rate', 'leaks_detected', 'time', 'energy', 'stability', 'success_rate']
-    
-    # Filtrer les colonnes qui existent
-    available_columns = [col for col in display_columns if col in df_results.columns]
-    df_display = df_results[available_columns].copy()
-    
-    # Renommer les colonnes pour meilleure lisibilité
-    column_rename = {
-        'position': 'Position',
-        'mode': 'Mode',
-        'status': 'Statut',
-        'precision': 'Précision (%)',
-        'error_distance': 'Erreur (m)',
-        'gp_confidence': 'Confiance GP',
-        'detections': 'Détections',
-        'detection_rate': 'Taux Détection (%)',
-        'leaks_detected': 'Fuites Détectées',
-        'time': 'Temps (s)',
-        'energy': 'Énergie (J)',
-        'stability': 'Stabilité (%)',
-        'success_rate': 'Taux Succès'
-    }
-    
-    df_display = df_display.rename(columns=column_rename)
-    
-    # Afficher le tableau avec style
-    st.dataframe(
-        df_display,
-        use_container_width=True,
-        hide_index=True
-    )
-    
-    # Graphiques de visualisation
-    st.markdown("---")
-    st.markdown("### Visualisations")
-    
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        # Graphique de précision par position
-        fig = px.bar(
-            df_results, 
-            x='position', 
-            y='precision',
-            color='status',
-            title='Précision de Détection par Position',
-            labels={'precision': 'Précision (%)', 'position': 'Position'},
-            color_discrete_map={'Reussi': '#28a745', 'Partiel': '#ffc107', 'Echec': '#dc3545'}
-        )
-        fig.update_layout(showlegend=True)
-        st.plotly_chart(fig, use_container_width=True)
-    
-    with col2:
-        # Graphique d'erreur par position
-        error_numeric = pd.to_numeric(df_results['error_distance'].str.replace('m', '').str.replace('N/A', 'nan'), errors='coerce')
-        df_error = df_results.copy()
-        df_error['error_numeric'] = error_numeric
-        
-        fig = px.bar(
-            df_error[df_error['error_numeric'].notna()],
-            x='position',
-            y='error_numeric',
-            color='status',
-            title='Erreur de Localisation par Position',
-            labels={'error_numeric': 'Erreur (m)', 'position': 'Position'},
-            color_discrete_map={'Reussi': '#28a745', 'Partiel': '#ffc107', 'Echec': '#dc3545'}
-        )
-        fig.update_layout(showlegend=True)
-        st.plotly_chart(fig, use_container_width=True)
-    
-    # Graphiques supplémentaires
-    col3, col4 = st.columns(2)
-    
-    with col3:
-        # Graphique de confiance GP
-        gp_conf_numeric = pd.to_numeric(df_results['gp_confidence'].str.replace('%', ''), errors='coerce')
-        df_gp = df_results.copy()
-        df_gp['gp_conf_numeric'] = gp_conf_numeric
-        
-        # Convertir detections en numérique pour le size
-        detections_numeric = pd.to_numeric(df_gp['detections'], errors='coerce')
-        df_gp['detections_numeric'] = detections_numeric
-        
-        fig = px.scatter(
-            df_gp[df_gp['gp_conf_numeric'].notna()],
-            x='position',
-            y='gp_conf_numeric',
-            size='detections_numeric',
-            color='precision',
-            title='Confiance GP vs Précision',
-            labels={'gp_conf_numeric': 'Confiance GP (%)', 'position': 'Position', 'precision': 'Précision (%)'},
-            color_continuous_scale='RdYlGn'
-        )
-        st.plotly_chart(fig, use_container_width=True)
-    
-    with col4:
-        # Graphique comparatif par mode
-        if 'mode' in df_results.columns:
-            mode_summary = df_results.groupby('mode').agg({
-                'precision': lambda x: pd.to_numeric(x.str.replace('%', ''), errors='coerce').mean(),
-                'detections': lambda x: pd.to_numeric(x, errors='coerce').mean()
-            }).reset_index()
-            
-            fig = px.bar(
-                mode_summary,
-                x='mode',
-                y='precision',
-                title='Performance par Mode',
-                labels={'precision': 'Précision Moyenne (%)', 'mode': 'Mode'},
-                color='precision',
-                color_continuous_scale='RdYlGn'
-            )
-            st.plotly_chart(fig, use_container_width=True)
-    
-    # Analyse détaillée par statut
-    st.markdown("---")
-    st.markdown("### Analyse par Statut")
-    
-    status_summary = df_results.groupby('status').agg({
-        'position': 'count',
-        'precision': lambda x: pd.to_numeric(x.str.replace('%', ''), errors='coerce').mean(),
-        'error_distance': lambda x: pd.to_numeric(x.str.replace('m', '').str.replace('N/A', 'nan'), errors='coerce').mean()
-    }).rename(columns={'position': 'Nombre', 'precision': 'Précision Moyenne (%)', 'error_distance': 'Erreur Moyenne (m)'})
-    
-    st.dataframe(status_summary, use_container_width=True)
 
 def visualize_plume():
     """Visualise le panache"""
@@ -4062,9 +3794,12 @@ def run_simulation():
                 if hasattr(enhanced_detector, 'estimate_all_leak_positions'):
                     try:
                         all_estimated_positions = enhanced_detector.estimate_all_leak_positions(
-                            min_probability=0.5,  # Seuil de probabilité (ajustable)
-                            min_distance=5.0      # Distance minimale entre positions (m)
+                            min_probability=0.75,  # Seuil de probabilité élevé pour éviter trop de faux positifs
+                            min_distance=2.0      # Distance minimale entre positions (m) - augmentée pour éviter doublons
                         )
+                        # Limiter le nombre de positions retournées (max 5 pour éviter trop de détections)
+                        if len(all_estimated_positions) > 5:
+                            all_estimated_positions = all_estimated_positions[:5]
                     except Exception as e:
                         # Fallback sur estimate_leak_position
                         temp_pos, temp_conf = enhanced_detector.estimate_leak_position()
@@ -4077,8 +3812,9 @@ def run_simulation():
                         all_estimated_positions = [(temp_pos, temp_conf)]
                 
                 if all_estimated_positions:
-                    # Prendre la meilleure position pour les métriques en temps réel
-                    best_estimated, best_confidence = all_estimated_positions[0]
+                    # IMPORTANT : Trier par probabilité décroissante et prendre la meilleure position
+                    all_estimated_positions_sorted = sorted(all_estimated_positions, key=lambda x: x[1], reverse=True)
+                    best_estimated, best_confidence = all_estimated_positions_sorted[0] if all_estimated_positions_sorted else (None, 0.0)
                     
                     # Pour multi-fuites, calculer l'erreur à la source la plus proche
                     if use_multi_source and all_leak_positions:
@@ -4099,30 +3835,53 @@ def run_simulation():
                     if 'detected_leaks' not in st.session_state:
                         st.session_state.detected_leaks = []
                     
+                    # IMPORTANT : Trier les positions par probabilité décroissante AVANT traitement
+                    all_estimated_positions_sorted = sorted(all_estimated_positions, key=lambda x: x[1], reverse=True)
+                    
+                    # IMPORTANT : Filtrer strictement les positions avec probabilité GP > 75%
+                    # Ne garder que les positions qui respectent le seuil minimum
+                    filtered_positions = [(pos, conf) for pos, conf in all_estimated_positions_sorted if float(conf) > 0.75]
+                    
+                    # Si aucune position ne respecte le seuil, ne rien afficher
+                    if not filtered_positions:
+                        all_estimated_positions_sorted = []
+                    else:
+                        all_estimated_positions_sorted = filtered_positions
+                    
                     # Pour chaque position estimée, vérifier si elle est nouvelle
                     new_detections_count = 0
-                    for est_pos, est_conf in all_estimated_positions:
+                    for est_pos, est_conf in all_estimated_positions_sorted:
+                        # IMPORTANT : S'assurer que est_conf est dans [0, 1] (probabilité valide)
+                        est_conf = float(np.clip(est_conf, 0.0, 1.0))
+                        
                         # Vérifier si cette position n'a pas déjà été détectée
                         is_new_detection = True
                         for detected in st.session_state.detected_leaks:
                             dist = np.linalg.norm(est_pos - np.array(detected['position']))
-                            if dist < 5.0:  # Si déjà détectée à moins de 5m
-                                # Mettre à jour la confiance si la nouvelle est meilleure
-                                if est_conf > detected.get('confidence', 0.0):
-                                    detected['confidence'] = est_conf
+                            if dist < 10.0:  # Si déjà détectée à moins de 10m (augmenté pour éviter doublons)
+                                # IMPORTANT : Mettre à jour la probabilité GP si la nouvelle est meilleure
+                                # est_conf est la probabilité GP (score combiné basé sur GP) dans [0, 1]
+                                old_conf = float(np.clip(detected.get('confidence', 0.0), 0.0, 1.0))
+                                if est_conf > old_conf:
+                                    detected['confidence'] = est_conf  # Probabilité GP dans [0, 1]
                                     detected['step'] = step
                                     detected['time'] = step * env_config.time_step
+                                    log_message(f"   Mise a jour: Position ({detected['position'][0]:.2f}, {detected['position'][1]:.2f}) m | Prob GP: {old_conf:.1%} -> {est_conf:.1%}")
                                 is_new_detection = False
                                 break
                         
                         if is_new_detection:
-                            # Stocker la nouvelle détection
-                            st.session_state.detected_leaks.append({
+                            # IMPORTANT : est_conf est la probabilité GP retournée par estimate_all_leak_positions()
+                            # Cette valeur est un score combiné basé sur le GP (concentration normalisée + confiance)
+                            # La valeur est garantie dans [0, 1] par np.clip() ci-dessus
+                            # Stocker la nouvelle détection avec la probabilité GP
+                            new_detection = {
                                 'position': est_pos.tolist(),
-                                'confidence': est_conf,
+                                'confidence': est_conf,  # Probabilité GP (score combiné basé sur GP) dans [0, 1]
                                 'step': step,
                                 'time': step * env_config.time_step
-                            })
+                            }
+                            st.session_state.detected_leaks.append(new_detection)
                             new_detections_count += 1
                             
                             # AMÉLIORATION : Retirer la source détectée de la liste des sources non détectées
@@ -4141,16 +3900,20 @@ def run_simulation():
                                     removed_source = undetected_sources.pop(closest_source_idx)
                                     log_message(f"   Source ({removed_source[0]:.1f}, {removed_source[1]:.1f}) retirée de la liste des cibles. {len(undetected_sources)} source(s) restante(s).")
                             
-                            log_message(f"POINT DE FUITE DETECTE: ({est_pos[0]:.2f}, {est_pos[1]:.2f}) m | Confiance: {est_conf:.1%}")
+                            # IMPORTANT : Afficher la probabilité GP dans le log (doit correspondre à celle stockée)
+                            # est_conf est la probabilité GP(confiance_moyenne) (score combiné basé sur GP) retournée par estimate_all_leak_positions()
+                            log_message(f"Potentiel point de fuite detecte : ({est_pos[0]:.2f}, {est_pos[1]:.2f}) m | Confiance_moyenne : {est_conf:.1%} | La recherche continue...")
                     
                     if new_detections_count > 0:
                         log_message(f"   {new_detections_count} nouvelle(s) position(s) détectée(s) sur la carte GP. Total: {len(st.session_state.detected_leaks)} position(s).")
                         log_message(f"   La recherche continue pour détecter d'autres fuites...")
                         # Afficher une notification mais continuer
-                        if new_detections_count == 1:
-                            st.warning(f"**Point de fuite detecte** : ({all_estimated_positions[0][0][0]:.2f}, {all_estimated_positions[0][0][1]:.2f}) m | Confiance: {all_estimated_positions[0][1]:.1%} | La recherche continue...")
+                        # Utiliser la position avec la plus haute probabilité (première dans la liste triée)
+                        if new_detections_count == 1 and all_estimated_positions_sorted:
+                            best_new_pos, best_new_conf = all_estimated_positions_sorted[0]
+                            st.warning(f"**Potentiel point de fuite detecte** : ({best_new_pos[0]:.2f}, {best_new_pos[1]:.2f}) m | Probabilite GP: {best_new_conf:.1%} | La recherche continue...")
                         else:
-                            st.warning(f"**{new_detections_count} point(s) de fuite detecte(s)** sur la carte GP | Total: {len(st.session_state.detected_leaks)} position(s) | La recherche continue...")
+                            st.warning(f"**{new_detections_count} potentiel(s) point(s) de fuite detecte(s)** sur la carte GP | Total: {len(st.session_state.detected_leaks)} position(s) | La recherche continue...")
             
             # Progression
             progress = (step + 1) / ai_config['max_steps'] * 100
@@ -4184,19 +3947,17 @@ def run_simulation():
                         st.metric("Énergie", f"{energy_consumed:.1f} J", 
                                  f"Efficacité: {detection_count/max(1,energy_consumed)*1000:.2f} dét/kJ")
                     with col4:
-                        if realtime_metrics.get('error') is not None:
-                            error = realtime_metrics['error']
+                        # TOUJOURS afficher la position du drone (jamais "Erreur Localisation")
+                        drone_pos = realtime_metrics['position']
+                        # Afficher la position du drone avec des informations supplémentaires si disponibles
+                        if realtime_metrics.get('estimated_position') is not None:
+                            est_pos = realtime_metrics['estimated_position']
                             confidence = realtime_metrics.get('estimation_confidence', 0.0)
-                            st.metric("Erreur Localisation", f"{error:.2f} m",
-                                     f"Confiance: {confidence:.1%}")
-                        elif realtime_metrics.get('estimated_position') is not None:
-                            pos = realtime_metrics['estimated_position']
-                            confidence = realtime_metrics.get('estimation_confidence', 0.0)
-                            st.metric("Position Estimee", f"({pos[0]:.1f}, {pos[1]:.1f})",
-                                     f"Confiance: {confidence:.1%}")
+                            st.metric("Position Drone", f"({drone_pos[0]:.1f}, {drone_pos[1]:.1f})",
+                                     f"Fuite estimée: ({est_pos[0]:.1f}, {est_pos[1]:.1f}) | Conf: {confidence:.1%}")
                         else:
-                            st.metric("Position Drone", f"({realtime_metrics['position'][0]:.1f}, {realtime_metrics['position'][1]:.1f})",
-                                     "En attente detection")
+                            st.metric("Position Drone", f"({drone_pos[0]:.1f}, {drone_pos[1]:.1f})",
+                                     "En recherche")
                 
                 # Visualisation en temps réel : Carte GP + Trajectoire
                 if step % 20 == 0 or step == 0:  # Mise à jour toutes les 20 étapes pour performance
@@ -4229,8 +3990,73 @@ def run_simulation():
                                             row=1, col=1
                                         )
                                         
+                                        # IMPORTANT : Extraire TOUTES les positions visibles sur la carte GP avec probabilité > 75%
+                                        # La carte peut contenir des positions qui ne sont pas retournées par estimate_all_leak_positions
+                                        # car elle utilise un score combiné différent
+                                        positions_from_map = []
+                                        threshold = 0.75
+                                        for i in range(prob_map.shape[0]):
+                                            for j in range(prob_map.shape[1]):
+                                                prob_value = float(prob_map[i, j])
+                                                if prob_value > threshold:
+                                                    pos_x = float(XX[i, j])
+                                                    pos_y = float(YY[i, j])
+                                                    positions_from_map.append((np.array([pos_x, pos_y]), prob_value))
+                                        
+                                        # Clustering pour éviter les doublons proches (distance < 5m)
+                                        if positions_from_map:
+                                            from sklearn.cluster import DBSCAN
+                                            positions_array = np.array([pos[0] for pos in positions_from_map])
+                                            clustering = DBSCAN(eps=5.0, min_samples=1).fit(positions_array)
+                                            
+                                            # Pour chaque cluster, prendre la position avec la probabilité la plus élevée
+                                            unique_positions = []
+                                            for cluster_id in set(clustering.labels_):
+                                                cluster_mask = clustering.labels_ == cluster_id
+                                                cluster_positions = [positions_from_map[i] for i in range(len(positions_from_map)) if cluster_mask[i]]
+                                                # Trier par probabilité décroissante et prendre la meilleure
+                                                cluster_positions.sort(key=lambda x: x[1], reverse=True)
+                                                unique_positions.append(cluster_positions[0])
+                                            
+                                            # Trier toutes les positions uniques par probabilité décroissante
+                                            unique_positions.sort(key=lambda x: x[1], reverse=True)
+                                            
+                                            # Limiter à 5 positions maximum
+                                            if len(unique_positions) > 5:
+                                                unique_positions = unique_positions[:5]
+                                            
+                                            # Ajouter ces positions à all_detected_leaks si elles ne sont pas déjà présentes
+                                            if 'detected_leaks' not in st.session_state:
+                                                st.session_state.detected_leaks = []
+                                            
+                                            for pos, conf in unique_positions:
+                                                # Vérifier si cette position n'est pas déjà dans detected_leaks
+                                                is_already_present = False
+                                                for detected in st.session_state.detected_leaks:
+                                                    dist = np.linalg.norm(pos - np.array(detected['position']))
+                                                    if dist < 5.0:  # Si déjà présente à moins de 5m
+                                                        # Mettre à jour la probabilité si plus élevée
+                                                        old_conf = float(detected.get('confidence', 0.0))
+                                                        if conf > old_conf:
+                                                            detected['confidence'] = float(np.clip(conf, 0.0, 1.0))
+                                                            detected['step'] = step
+                                                            detected['time'] = step * env_config.time_step
+                                                        is_already_present = True
+                                                        break
+                                                
+                                                if not is_already_present:
+                                                    # Ajouter la nouvelle position
+                                                    st.session_state.detected_leaks.append({
+                                                        'position': pos.tolist(),
+                                                        'confidence': float(np.clip(conf, 0.0, 1.0)),
+                                                        'step': step,
+                                                        'time': step * env_config.time_step
+                                                    })
+                                                    # Log pour informer de la nouvelle position extraite de la carte
+                                                    log_message(f"Position extraite de la carte GP: ({pos[0]:.2f}, {pos[1]:.2f}) m | Probabilite GP: {conf:.1%}")
+                                        
                                         # AMÉLIORATION : Afficher TOUTES les positions de fuite détectées sur la carte GP
-                                        # Récupérer toutes les positions détectées
+                                        # Récupérer toutes les positions détectées (maintenant mises à jour avec celles de la carte)
                                         all_detected = st.session_state.get('detected_leaks', [])
                                         
                                         if all_detected:
@@ -4442,9 +4268,12 @@ def run_simulation():
         if hasattr(enhanced_detector, 'estimate_all_leak_positions'):
             try:
                 all_estimated_positions = enhanced_detector.estimate_all_leak_positions(
-                    min_probability=0.5,  # Seuil de probabilité
-                    min_distance=5.0      # Distance minimale entre positions (m)
+                    min_probability=0.75,  # Seuil de probabilité élevé pour éviter trop de faux positifs
+                    min_distance=10.0      # Distance minimale entre positions (m) - augmentée pour éviter doublons
                 )
+                # Limiter le nombre de positions retournées (max 5 pour éviter trop de détections)
+                if len(all_estimated_positions) > 5:
+                    all_estimated_positions = all_estimated_positions[:5]
             except Exception as e:
                 log_message(f"ERREUR lors de l'appel à estimate_all_leak_positions: {e}")
                 # Fallback sur estimate_leak_position
@@ -4458,18 +4287,28 @@ def run_simulation():
             if temp_pos is not None:
                 all_estimated_positions = [(temp_pos, temp_conf)]
         
+        # IMPORTANT : Filtrer strictement les positions avec probabilité GP > 75%
+        # Ne garder que les positions qui respectent le seuil minimum
+        filtered_positions = [(pos, conf) for pos, conf in all_estimated_positions if float(conf) > 0.75]
+        
         # IMPORTANT : La meilleure position (probabilité la plus élevée) est utilisée pour les statistiques
         # La liste est déjà triée par probabilité décroissante (première = meilleure)
         estimated_pos = None
         estimation_confidence = 0.0
-        if all_estimated_positions:
+        if filtered_positions:
             # Prendre la première position (probabilité la plus élevée) pour les métriques
-            estimated_pos, estimation_confidence = all_estimated_positions[0]
-            log_message(f"SUCCES: {len(all_estimated_positions)} position(s) detectee(s) sur la carte GP. Meilleure: ({estimated_pos[0]:.2f}, {estimated_pos[1]:.2f}) m, confiance: {estimation_confidence:.1%}")
+            estimated_pos, estimation_confidence = filtered_positions[0]
+            # IMPORTANT : S'assurer que la probabilité est dans [0, 1]
+            estimation_confidence = float(np.clip(estimation_confidence, 0.0, 1.0))
+            log_message(f"SUCCES: {len(filtered_positions)} position(s) detectee(s) sur la carte GP (probabilité > 75%). Meilleure: ({estimated_pos[0]:.2f}, {estimated_pos[1]:.2f}) m, confiance: {estimation_confidence:.1%}")
+            # Mettre à jour all_estimated_positions pour les affichages ultérieurs
+            all_estimated_positions = filtered_positions
         else:
             # Fallback : utiliser estimate_leak_position() pour la meilleure position
             estimated_pos, estimation_confidence = enhanced_detector.estimate_leak_position()
             if estimated_pos is not None:
+                # IMPORTANT : S'assurer que la probabilité est dans [0, 1]
+                estimation_confidence = float(np.clip(estimation_confidence, 0.0, 1.0))
                 all_estimated_positions = [(estimated_pos, estimation_confidence)]
                 log_message(f"SUCCES: Position detectee (fallback): ({estimated_pos[0]:.2f}, {estimated_pos[1]:.2f}) m, confiance: {estimation_confidence:.1%}")
         
@@ -4486,28 +4325,26 @@ def run_simulation():
                 log_message("ATTENTION: Utilisation de la position detectee du validateur (pas d'estimation GP)")
         
         # AMÉLIORATION : Stocker TOUTES les positions détectées dans st.session_state si pas déjà fait
-        # IMPORTANT : Les positions sont déjà triées par probabilité décroissante dans all_estimated_positions
+        # IMPORTANT : Trier les positions par probabilité décroissante AVANT stockage
         # (première = meilleure probabilité GP)
         if not st.session_state.get('detected_leaks') or len(st.session_state.get('detected_leaks', [])) == 0:
             # Si aucune position n'a été stockée pendant la simulation, utiliser les positions estimées
             if all_estimated_positions:
                 st.session_state.detected_leaks = []
-                # Les positions sont déjà triées par probabilité décroissante depuis estimate_all_leak_positions
-                for est_pos, est_conf in all_estimated_positions:
+                # IMPORTANT : Filtrer strictement les positions avec probabilité GP > 75%
+                filtered_positions = [(pos, conf) for pos, conf in all_estimated_positions if float(conf) > 0.75]
+                # Trier par probabilité décroissante AVANT stockage
+                all_estimated_positions_sorted = sorted(filtered_positions, key=lambda x: x[1], reverse=True)
+                for est_pos, est_conf in all_estimated_positions_sorted:
                     st.session_state.detected_leaks.append({
                         'position': est_pos.tolist() if isinstance(est_pos, np.ndarray) else list(est_pos),
                         'confidence': est_conf,  # Probabilité GP (pas confiance de détection)
                         'step': step + 1,
                         'time': (step + 1) * env_config.time_step
                     })
-                # S'assurer que la liste est triée par probabilité décroissante
+                # S'assurer que la liste est triée par probabilité décroissante (double vérification)
                 st.session_state.detected_leaks.sort(key=lambda x: x.get('confidence', 0.0), reverse=True)
                 log_message(f"INFO: {len(all_estimated_positions)} position(s) stockee(s) dans detected_leaks (triees par probabilite GP)")
-        
-        # IMPORTANT : La meilleure position (première dans la liste, probabilité la plus élevée) 
-        # est utilisée pour toutes les métriques et statistiques
-        if all_estimated_positions:
-            log_message(f"INFO: Position utilisee pour statistiques: ({estimated_pos[0]:.2f}, {estimated_pos[1]:.2f}) m (confiance: {estimation_confidence:.1%})")
         
         # AMÉLIORATION : Calculer les métriques pour toutes les positions détectées (multi-fuites)
         all_detected_leaks = st.session_state.get('detected_leaks', [])
@@ -4516,11 +4353,25 @@ def run_simulation():
         # La probabilité GP est la confiance stockée dans detected_leaks
         all_detected_leaks_sorted = sorted(all_detected_leaks, key=lambda x: x.get('confidence', 0.0), reverse=True)
         
+        # IMPORTANT : Utiliser la meilleure position de all_detected_leaks_sorted (première = probabilité GP la plus élevée)
+        # pour estimated_pos et estimation_confidence, afin d'assurer la cohérence avec "RÉSULTATS DE LA DÉTECTION"
+        if all_detected_leaks_sorted:
+            best_detected = all_detected_leaks_sorted[0]  # Meilleure position (probabilité GP la plus élevée)
+            estimated_pos = np.array(best_detected['position'])
+            estimation_confidence = float(np.clip(best_detected.get('confidence', 0.0), 0.0, 1.0))
+            log_message(f"INFO: Meilleure position utilisee (depuis RÉSULTATS DE LA DÉTECTION): ({estimated_pos[0]:.2f}, {estimated_pos[1]:.2f}) m (probabilite GP: {estimation_confidence:.1%})")
+        elif all_estimated_positions:
+            # Fallback : utiliser la meilleure position de all_estimated_positions
+            estimated_pos, estimation_confidence = all_estimated_positions[0]
+            estimation_confidence = float(np.clip(estimation_confidence, 0.0, 1.0))
+            log_message(f"INFO: Position utilisee pour statistiques (fallback): ({estimated_pos[0]:.2f}, {estimated_pos[1]:.2f}) m (confiance: {estimation_confidence:.1%})")
+        
         # Calculer les erreurs pour toutes les positions détectées
         if use_multi_source and all_leak_positions and all_detected_leaks_sorted:
+            # IMPORTANT : Utiliser all_detected_leaks_sorted (déjà trié par probabilité GP décroissante)
             # Pour chaque position détectée, trouver la source réelle la plus proche
             errors_per_detection = []
-            for detected in all_detected_leaks:
+            for detected in all_detected_leaks_sorted:  # Utiliser la liste triée
                 detected_pos = np.array(detected['position'])
                 min_error = float('inf')
                 closest_real_pos = None
@@ -4542,10 +4393,33 @@ def run_simulation():
                 max_error = np.max([e['error'] for e in errors_per_detection])
                 min_error = np.min([e['error'] for e in errors_per_detection])
                 
+                # IMPORTANT : Utiliser TOUJOURS la meilleure position de all_detected_leaks_sorted (probabilité GP la plus élevée)
+                # Cette position est la même que celle utilisée dans "RÉSULTATS DE LA DÉTECTION" (première dans la liste triée)
+                if all_detected_leaks_sorted:
+                    best_detected = all_detected_leaks_sorted[0]  # Meilleure position (probabilité GP la plus élevée)
+                    best_detected_position = np.array(best_detected['position'])
+                    best_confidence = float(np.clip(best_detected.get('confidence', 0.0), 0.0, 1.0))
+                elif estimated_pos is not None:
+                    # Fallback : utiliser estimated_pos
+                    best_detected_position = estimated_pos
+                    best_confidence = estimation_confidence
+                else:
+                    # Fallback : utiliser la première position de errors_per_detection (déjà triée par probabilité décroissante)
+                    # Trier errors_per_detection par confiance décroissante pour garantir
+                    errors_per_detection_sorted = sorted(errors_per_detection, key=lambda x: x['confidence'], reverse=True)
+                    if errors_per_detection_sorted:
+                        best_detected_position = errors_per_detection_sorted[0]['detected']
+                        best_confidence = errors_per_detection_sorted[0]['confidence']
+                    else:
+                        best_detected_position = None
+                        best_confidence = 0.0
+                
                 # Mettre à jour les métriques avec la moyenne
                 if performance_metrics.localization_accuracy:
                     performance_metrics.localization_accuracy.error_distance = avg_error
-                    performance_metrics.localization_accuracy.detected_position = estimated_pos if estimated_pos is not None else errors_per_detection[0]['detected']
+                    # GARANTIR : Utiliser la meilleure position (probabilité GP la plus élevée)
+                    performance_metrics.localization_accuracy.detected_position = best_detected_position
+                    log_message(f"INFO: Position utilisee dans 'Details de Localisation': ({best_detected_position[0]:.2f}, {best_detected_position[1]:.2f}) m (probabilite GP: {best_confidence:.1%})")
                     # Ajouter des informations supplémentaires
                     if hasattr(performance_metrics.localization_accuracy, 'max_error'):
                         performance_metrics.localization_accuracy.max_error = max_error
@@ -4553,10 +4427,23 @@ def run_simulation():
                         performance_metrics.localization_accuracy.n_detections = len(errors_per_detection)
         elif estimated_pos is not None:
             # Cas simple : une seule position
-            error = np.linalg.norm(estimated_pos - np.array(true_leak_pos))
+            # IMPORTANT : Utiliser la meilleure position de all_detected_leaks_sorted si disponible
+            # Sinon utiliser estimated_pos (qui est déjà la meilleure)
+            if all_detected_leaks_sorted:
+                best_detected = all_detected_leaks_sorted[0]  # Meilleure position (probabilité GP la plus élevée)
+                best_detected_position = np.array(best_detected['position'])
+                best_confidence = float(np.clip(best_detected.get('confidence', 0.0), 0.0, 1.0))
+                error = np.linalg.norm(best_detected_position - np.array(true_leak_pos))
+            else:
+                best_detected_position = estimated_pos
+                best_confidence = estimation_confidence
+                error = np.linalg.norm(estimated_pos - np.array(true_leak_pos))
+            
             if performance_metrics.localization_accuracy:
                 performance_metrics.localization_accuracy.error_distance = error
-                performance_metrics.localization_accuracy.detected_position = estimated_pos
+                # GARANTIR : Utiliser la meilleure position (probabilité GP la plus élevée) de all_detected_leaks_sorted
+                performance_metrics.localization_accuracy.detected_position = best_detected_position
+                log_message(f"INFO: Position utilisee dans 'Details de Localisation': ({best_detected_position[0]:.2f}, {best_detected_position[1]:.2f}) m (probabilite GP: {best_confidence:.1%})")
                 
             # AFFICHAGE FINAL DE LA POSITION ESTIMÉE
             log_message("="*60)
@@ -4601,6 +4488,14 @@ def run_simulation():
         
         # Vérifier si validateur GP a été utilisé
         gp_validator_used = enhanced_detector.use_gp_validator and enhanced_detector.gp_validator is not None
+        
+        # IMPORTANT : S'assurer que estimated_pos et estimation_confidence sont la meilleure position
+        # de all_detected_leaks_sorted (probabilité GP la plus élevée) pour cohérence avec "RÉSULTATS DE LA DÉTECTION"
+        if all_detected_leaks_sorted:
+            best_detected = all_detected_leaks_sorted[0]  # Meilleure position (probabilité GP la plus élevée)
+            estimated_pos = np.array(best_detected['position'])
+            estimation_confidence = float(np.clip(best_detected.get('confidence', 0.0), 0.0, 1.0))
+            log_message(f"INFO: Meilleure position stockee dans results: ({estimated_pos[0]:.2f}, {estimated_pos[1]:.2f}) m (probabilite GP: {estimation_confidence:.1%})")
         
         st.session_state.simulation_results = {
             'trajectory': trajectory,
@@ -4652,6 +4547,8 @@ def run_simulation():
         all_detected_leaks = st.session_state.get('detected_leaks', [])
         
         # Ajouter la position estimée finale si elle n'est pas déjà dans la liste
+        # IMPORTANT : estimation_confidence est la probabilité GP (score combiné basé sur GP)
+        # Elle doit être cohérente avec les valeurs stockées pendant la simulation
         if estimated_pos is not None:
             # Vérifier si cette position n'est pas déjà dans la liste
             is_already_detected = False
@@ -4659,46 +4556,61 @@ def run_simulation():
                 dist = np.linalg.norm(estimated_pos - np.array(detected['position']))
                 if dist < 5.0:  # Si déjà détectée à moins de 5m
                     is_already_detected = True
-                    # Mettre à jour la confiance si plus élevée
-                    if estimation_confidence > detected['confidence']:
-                        detected['confidence'] = estimation_confidence
+                    # IMPORTANT : Mettre à jour la probabilité GP si plus élevée
+                    # estimation_confidence est la probabilité GP (score combiné basé sur GP)
+                    old_conf = float(detected.get('confidence', 0.0))
+                    if estimation_confidence > old_conf:
+                        detected['confidence'] = float(estimation_confidence)  # Probabilité GP
                     break
             
             if not is_already_detected:
+                # IMPORTANT : Stocker la probabilité GP (score combiné basé sur GP)
                 all_detected_leaks.append({
                     'position': estimated_pos.tolist(),
-                    'confidence': estimation_confidence,
+                    'confidence': float(estimation_confidence),  # Probabilité GP
                     'step': step,
                     'time': step * env_config.time_step
                 })
         
+        # IMPORTANT : Trier les positions par probabilité GP décroissante (meilleure en premier)
+        # La probabilité GP est stockée dans 'confidence' (score combiné basé sur GP)
+        # Normaliser et valider toutes les probabilités avant tri pour garantir [0, 1]
+        for leak in all_detected_leaks:
+            leak['confidence'] = float(np.clip(leak.get('confidence', 0.0), 0.0, 1.0))
+        
+        all_detected_leaks_sorted = sorted(all_detected_leaks, key=lambda x: float(x.get('confidence', 0.0)), reverse=True)
+        
         # Afficher toutes les détections
-        if all_detected_leaks:
-            st.success(f" **{len(all_detected_leaks)} potentiels points de fuite détectés (s)**")
+        if all_detected_leaks_sorted:
+            st.success(f" **{len(all_detected_leaks_sorted)} potentiels points de fuite détectés (s)**")
             
-            # Créer un DataFrame pour affichage
+            # IMPORTANT : Créer un DataFrame pour affichage avec positions triées par probabilité GP décroissante
+            # La valeur 'confidence' est la probabilité GP (score combiné basé sur GP) stockée pendant la simulation
+            # Elle doit correspondre exactement à celle affichée dans les logs
             leaks_df = pd.DataFrame([
                 {
                     'ID': i+1,
                     'Position X (m)': f"{leak['position'][0]:.2f}",
                     'Position Y (m)': f"{leak['position'][1]:.2f}",
-                    'Confiance': f"{leak['confidence']:.1%}",
+                    'Probabilité GP': f"{float(leak['confidence']):.1%}",  # Probabilité GP (score combiné basé sur GP)
                     'Étape': leak['step'],
                     'Temps (s)': f"{leak['time']:.1f}"
                 }
-                for i, leak in enumerate(all_detected_leaks)
+                for i, leak in enumerate(all_detected_leaks_sorted)  # Utiliser la liste triée
             ])
             st.dataframe(leaks_df, use_container_width=True, hide_index=True)
+            st.caption("**Note** : Les positions sont triées par probabilité GP décroissante (meilleure estimation en premier). La probabilité GP affichée correspond à celle des logs.")
             
             # Afficher sur la carte si possible
-            if len(all_detected_leaks) > 0:
+            if len(all_detected_leaks_sorted) > 0:
                 st.markdown("**Carte des positions détectées :**")
                 fig = go.Figure()
                 
-                # Ajouter les positions détectées
-                for i, leak in enumerate(all_detected_leaks):
+                # Ajouter les positions détectées (triées par probabilité GP décroissante)
+                # IMPORTANT : Utiliser la même valeur de probabilité GP que dans les logs et le tableau
+                for i, leak in enumerate(all_detected_leaks_sorted):
                     pos = leak['position']
-                    conf = leak['confidence']
+                    prob_gp = float(leak.get('confidence', 0.0))  # Probabilité GP (score combiné basé sur GP)
                     fig.add_trace(go.Scatter(
                         x=[pos[0]],
                         y=[pos[1]],
@@ -4709,10 +4621,10 @@ def run_simulation():
                             symbol='star',
                             line=dict(width=2, color='darkred')
                         ),
-                        text=[f"Fuite {i+1}<br>Conf: {conf:.1%}"],
+                        text=[f"Fuite {i+1}<br>Prob GP: {prob_gp:.1%}"],  # Afficher "Prob GP" pour clarté
                         textposition="top center",
                         name=f"Fuite détectée {i+1}",
-                        hovertemplate=f"<b>Fuite {i+1}</b><br>Position: ({pos[0]:.2f}, {pos[1]:.2f}) m<br>Confiance: {conf:.1%}<extra></extra>"
+                        hovertemplate=f"<b>Fuite {i+1}</b><br>Position: ({pos[0]:.2f}, {pos[1]:.2f}) m<br>Probabilité GP: {prob_gp:.1%}<extra></extra>"
                     ))
                 
                 # Ajouter la trajectoire
@@ -4738,7 +4650,7 @@ def run_simulation():
                 st.plotly_chart(fig, use_container_width=True)
         else:
             if estimated_pos is not None:
-                st.info(f"**Position estimée (GP VALIDATOR):** ({estimated_pos[0]:.2f}, {estimated_pos[1]:.2f}) m | Confiance: {estimation_confidence:.1%}")
+                st.info(f"**Position estimée (GP VALIDATOR):** ({estimated_pos[0]:.2f}, {estimated_pos[1]:.2f}) m | Probabilité GP: {estimation_confidence:.1%}")
             else:
                 st.warning("Aucune fuite détectée avec confiance suffisante.")
         
@@ -4750,521 +4662,6 @@ def run_simulation():
     
     finally:
         st.session_state.simulation_running = False
-
-def run_learning_analysis():
-    """Lance l'analyse d'apprentissage"""
-    np.random.seed(42)
-    
-    learning_data = []
-    for step in range(1000):
-        loss_rl = 1.0 * np.exp(-step/200) + 0.1 * np.random.normal()
-        loss_kl = 0.5 * np.exp(-step/300) + 0.05 * np.random.normal()
-        total_loss = loss_rl + 0.1 * loss_kl
-        epsilon = max(0.01, 1.0 - step/500)
-        reward = 2.0 * (1 - np.exp(-step/100)) + 0.5 * np.random.normal()
-        
-        detection_prob = min(0.8, step/800)
-        detection = np.random.random() < detection_prob
-        concentration = np.random.exponential(0.1) if detection else np.random.exponential(0.01)
-        
-        learning_data.append({
-            'step': step,
-            'loss_rl': loss_rl,
-            'loss_kl': loss_kl,
-            'total_loss': total_loss,
-            'epsilon': epsilon,
-            'reward': reward,
-            'detection': detection,
-            'concentration': concentration
-        })
-    
-    df = pd.DataFrame(learning_data)
-    df['loss_ma'] = df['total_loss'].rolling(window=50).mean()
-    df['loss_std'] = df['total_loss'].rolling(window=50).std()
-    
-    st.session_state.learning_history = df.to_dict('records')
-    st.success("Analyse d'apprentissage terminée")
-
-def run_position_tests(iterations, steps, mode):
-    """Lance les tests de positions avec vraies simulations"""
-    import time
-    from highlight_plus.analysis.performance_validator import PerformanceValidator
-    
-    test_results = []
-    progress_bar = st.progress(0)
-    status_text = st.empty()
-    
-    # Liste pour stocker les métriques d'itération
-    all_iteration_metrics = []
-    
-    total_positions = sum(1 for pos in st.session_state.leak_positions if pos['active'])
-    total_tests = total_positions * iterations
-    current_test = 0
-    
-    log_message(f"Demarrage des tests de robustesse")
-    log_message(f"   Positions: {total_positions}, Itérations: {iterations}, Étapes: {steps}")
-    
-    # Récupérer la configuration actuelle
-    sensor_config = TDLASConfig(**st.session_state.get('sensor_config', {
-        'noise_level': 0.05,
-        'detection_threshold': 0.02
-    }))
-    drone_config = st.session_state.get('drone_config', {
-        'initial_x': 10.0,
-        'initial_y': 10.0,
-        'initial_altitude': 5.0
-    })
-    # Déterminer le mode de simulation selon le mode de test
-    if mode == 'all':
-        # Tester tous les modes
-        test_modes = ['simple', 'teacher_student', 'full_learning']
-    elif mode == 'teacher':
-        test_modes = ['teacher_student']
-    elif mode == 'student':
-        test_modes = ['full_learning']
-    else:  # comparison ou autre
-        test_modes = ['full_learning']  # Par défaut
-    
-    # Récupérer la configuration de base
-    base_ai_config = st.session_state.get('ai_config', {})
-    
-    # Gérer les multiples fuites si configurées
-    active_positions = [pos for pos in st.session_state.leak_positions if pos.get('active', False)]
-    is_multi_leak = len(active_positions) > 1
-    
-    # Pour chaque mode à tester
-    for test_mode_value in test_modes:
-        # Mettre à jour la configuration avec le mode de test
-        ai_config = base_ai_config.copy()
-        ai_config['simulation_mode'] = test_mode_value
-        mode_display = get_mode_display_name(test_mode_value)
-        
-        log_message(f"Tests avec {mode_display}...")
-        
-        # Pour chaque position de fuite
-        for pos_idx, leak_pos in enumerate(active_positions):
-            position_key = f"({leak_pos['x']:.1f}, {leak_pos['y']:.1f})"
-            log_message(f"Test position {position_key} avec {mode_display}...")
-            
-            total_detections = 0
-            total_time = 0
-            total_energy = 0
-            total_precision = 0
-            successful_detections = 0
-            all_detected_leaks_per_position = []  # Pour stocker toutes les fuites détectées pour cette position
-            
-            for iteration in range(iterations):
-                current_test += 1
-                total_tests_calc = len(test_modes) * len(active_positions) * iterations
-                progress = current_test / total_tests_calc if total_tests_calc > 0 else 0
-                progress_bar.progress(progress)
-                status_text.text(f"{mode_display} - Position {pos_idx+1}/{len(active_positions)}, Itération {iteration+1}/{iterations}")
-            
-            try:
-                # Configuration du panache avec cette position
-                plume_config = PlumeConfig(
-                    leak_x=leak_pos['x'],
-                    leak_y=leak_pos['y'],
-                    leak_intensity=leak_pos.get('intensity', 0.3),
-                    wind_speed=st.session_state.plume_config.get('wind_speed', 2.0),
-                    wind_direction=st.session_state.plume_config.get('wind_direction', 45.0),
-                    sigma_x=st.session_state.plume_config.get('sigma_x', 5.0),
-                    sigma_y=st.session_state.plume_config.get('sigma_y', 5.0)
-                )
-                
-                env_config = EnvironmentConfig(
-                    world_size=(100.0, 100.0),
-                    max_steps=steps,
-                    initial_position=(drone_config['initial_x'], drone_config['initial_y']),
-                    initial_altitude=drone_config['initial_altitude']
-                )
-                
-                # Création de l'environnement
-                env = MethaneDetectionEnv(env_config, plume_config, sensor_config)
-                obs, info = env.reset()
-                
-                # Validateur de performance
-                true_leak_pos = (plume_config.leak_x, plume_config.leak_y)
-                validator = PerformanceValidator(
-                    true_leak_position=true_leak_pos,
-                    tolerance_radius=10.0,
-                    time_step=env_config.time_step
-                )
-                
-                # Détecteur amélioré avec validateur GP
-                enhanced_detector = EnhancedDetector(
-                    true_leak_position=true_leak_pos,
-                    detection_threshold=sensor_config.detection_threshold,
-                    confidence_threshold=0.5,
-                    min_distance_for_detection=50.0,
-                    use_gp_validator=True,  # Activer le validateur GP
-                    gp_threshold_prob=0.95
-                )
-                
-                # Initialisation selon le mode avec paramètres de l'interface
-                teacher = None
-                student = None
-                
-                if ai_config['simulation_mode'] in ['teacher_student', 'full_learning']:
-                    teacher_config = TeacherConfig(
-                        # Kernel GP
-                        kernel_length_scale=ai_config.get('kernel_length_scale', 5.0),
-                        kernel_variance=ai_config.get('kernel_variance', 1.0),
-                        noise_level=ai_config.get('noise_level_gp', 1e-4),
-                        # Exploration
-                        exploration_parameter=ai_config.get('teacher_exploration', 2.0),
-                        acquisition_function="UCB",
-                        # Mouvement
-                        max_step_size=ai_config.get('max_step_size', 3.0),
-                        min_step_size=ai_config.get('min_step_size', 0.5),
-                        # Convergence
-                        max_iterations=ai_config.get('max_iterations', 200),
-                        convergence_threshold=ai_config.get('convergence_threshold', 5e-5),
-                        min_uncertainty=ai_config.get('min_uncertainty', 0.005)
-                    )
-                    teacher = GaussianProcessTeacher(teacher_config, world_bounds=(0, 100, 0, 100))
-                
-                # Initialiser le Student pour le mode full_learning
-                if ai_config['simulation_mode'] == 'full_learning':
-                    student_config = StudentConfig(
-                        learning_rate=ai_config.get('student_learning_rate', 2.5e-4),
-                        lambda_kl=ai_config.get('student_lambda_kl', 0.15),
-                        batch_size=ai_config.get('batch_size', 128),
-                        buffer_size=ai_config.get('buffer_size', 20000),
-                        learning_starts=200
-                    )
-                    student = StudentRL(
-                        state_dim=16,
-                        action_dim=3,
-                        config=student_config,
-                        teacher=teacher
-                    )
-                
-                # Simulation rapide
-                start_time = time.time()
-                detection_count = 0
-                
-                for step in range(steps):
-                    # Obtenir le gradient
-                    current_pos = env.drone_position[:2]
-                    grad_x, grad_y = env.plume.gradient(
-                        current_pos[0],
-                        current_pos[1],
-                        env.step_count * env.config.time_step
-                    )
-                    
-                    # Action selon le mode
-                    if ai_config['simulation_mode'] == 'full_learning' and student is not None:
-                        # Mode Teacher-Student : utiliser Student avec guidance Teacher
-                        obs_state = obs  # Utiliser l'observation actuelle
-                        
-                        # Guidance Teacher
-                        teacher_guidance = None
-                        if teacher is not None:
-                            next_x, next_y = teacher.select_next_point(
-                                current_pos[0], current_pos[1],
-                                gradient_x=grad_x, gradient_y=grad_y
-                            )
-                            teacher_dir = np.array([next_x, next_y]) - current_pos
-                            teacher_dir_norm = np.linalg.norm(teacher_dir)
-                            if teacher_dir_norm > 0.1:
-                                teacher_guidance = teacher_dir[:2] / teacher_dir_norm
-                        
-                        # Action Student
-                        action = student.select_action(obs_state, training=True, teacher_guidance=teacher_guidance)
-                        
-                    elif teacher is not None:
-                        # Mode Teacher : utiliser uniquement Teacher
-                        next_x, next_y = teacher.select_next_point(
-                            current_pos[0], current_pos[1],
-                            gradient_x=grad_x, gradient_y=grad_y
-                        )
-                        direction = np.array([next_x, next_y]) - current_pos
-                        direction_norm = np.linalg.norm(direction)
-                        if direction_norm > 0.1:
-                            action = np.array([
-                                direction[0] / direction_norm * 0.8,
-                                direction[1] / direction_norm * 0.8,
-                                0.0
-                            ], dtype=np.float32)
-                        else:
-                            action = env.action_space.sample() * 0.5
-                    else:
-                        # Mode simple : suivre le gradient
-                        grad_norm = np.linalg.norm([grad_x, grad_y])
-                        if grad_norm > 1e-6:
-                            action = np.array([
-                                grad_x / grad_norm * 0.7,
-                                grad_y / grad_norm * 0.7,
-                                0.0
-                            ], dtype=np.float32)
-                        else:
-                            action = env.action_space.sample() * 0.5
-                    
-                    action = np.clip(action, -1, 1)
-                    
-                    # Step
-                    obs, reward, terminated, truncated, info = env.step(action, teacher=teacher)
-                    
-                    # Mise à jour Student (pour full_learning)
-                    if ai_config['simulation_mode'] == 'full_learning' and student is not None:
-                        next_obs = obs
-                        student.store_experience(obs_state, action, reward, next_obs, terminated or truncated)
-                        
-                        # Apprentissage périodique
-                        if student.step_count > student.config.learning_starts and student.step_count % 10 == 0:
-                            student.learn()
-                        
-                        student.step_count += 1
-                        obs_state = next_obs
-                    
-                    # Mise à jour Teacher
-                    if teacher is not None and 'concentration' in info:
-                        teacher.add_observation(
-                            env.drone_position[0],
-                            env.drone_position[1],
-                            info['concentration']
-                        )
-                    
-                    # Enregistrement détection - Vérifier toutes les fuites configurées
-                    if info.get('detected', False) or (info.get('measured_concentration', 0) > sensor_config.detection_threshold):
-                        detection_count += 1
-                        validator.add_detection(
-                            position=env.drone_position,
-                            concentration=info.get('measured_concentration', 0),
-                            step=step,
-                            energy=info.get('total_energy', 0)
-                        )
-                        
-                        # Ajout au validateur GP
-                        if 'concentration' in info:
-                            gradient = np.array([grad_x, grad_y, 0.0])
-                            timestamp = step * env_config.time_step
-                            detection_event = enhanced_detector.validate_detection(
-                                position=env.drone_position,
-                                measured_concentration=info.get('measured_concentration', 0),
-                                real_concentration=info.get('concentration', 0),
-                                step=step,
-                                timestamp=timestamp,
-                                gradient=gradient
-                            )
-                            
-                            # Si une fuite est détectée, l'ajouter à la liste
-                            # AMÉLIORATION : Extraire TOUTES les positions de fuite de la carte GP
-                            if detection_event and detection_event.is_valid:
-                                # Utiliser estimate_all_leak_positions pour obtenir toutes les positions
-                                all_temp_estimated = []
-                                
-                                # Vérifier si la méthode existe
-                                if hasattr(enhanced_detector, 'estimate_all_leak_positions'):
-                                    try:
-                                        all_temp_estimated = enhanced_detector.estimate_all_leak_positions(
-                                            min_probability=0.5, 
-                                            min_distance=5.0
-                                        )
-                                    except Exception as e:
-                                        # Fallback sur estimate_leak_position
-                                        temp_estimated, temp_confidence = enhanced_detector.estimate_leak_position()
-                                        if temp_estimated is not None:
-                                            all_temp_estimated = [(temp_estimated, temp_confidence)]
-                                else:
-                                    # Si la méthode n'existe pas, utiliser estimate_leak_position comme fallback
-                                    temp_estimated, temp_confidence = enhanced_detector.estimate_leak_position()
-                                    if temp_estimated is not None:
-                                        all_temp_estimated = [(temp_estimated, temp_confidence)]
-                                
-                                # Si pas de positions multiples, utiliser la meilleure
-                                if not all_temp_estimated:
-                                    temp_estimated, temp_confidence = enhanced_detector.estimate_leak_position()
-                                    if temp_estimated is not None:
-                                        all_temp_estimated = [(temp_estimated, temp_confidence)]
-                                
-                                # Ajouter toutes les positions détectées
-                                for temp_estimated, temp_confidence in all_temp_estimated:
-                                    if temp_estimated is not None:
-                                        # Vérifier si cette fuite n'est pas déjà détectée (dans un rayon de 5m)
-                                        is_duplicate = False
-                                        for detected in all_detected_leaks_per_position:
-                                            dist = np.linalg.norm(temp_estimated - np.array(detected['position']))
-                                            if dist < 5.0:
-                                                is_duplicate = True
-                                                # Mettre à jour la confiance si plus élevée
-                                                if temp_confidence > detected['confidence']:
-                                                    detected['confidence'] = temp_confidence
-                                                    detected['position'] = temp_estimated.tolist()
-                                                break
-                                        
-                                        if not is_duplicate:
-                                            all_detected_leaks_per_position.append({
-                                                'position': temp_estimated.tolist(),
-                                                'confidence': temp_confidence,
-                                                'step': step,
-                                                'time': timestamp
-                                            })
-                    
-                    if terminated or truncated:
-                        break
-                
-                # Calcul des métriques
-                validator.total_steps = step + 1
-                metrics = validator.compute_metrics()
-                
-                # AMÉLIORATION : Extraire TOUTES les positions de fuite de la carte GP
-                all_estimated = []
-                
-                # Vérifier si la méthode existe
-                if hasattr(enhanced_detector, 'estimate_all_leak_positions'):
-                    try:
-                        all_estimated = enhanced_detector.estimate_all_leak_positions(
-                            min_probability=0.5, 
-                            min_distance=5.0
-                        )
-                    except Exception as e:
-                        # Fallback sur estimate_leak_position
-                        temp_pos, temp_conf = enhanced_detector.estimate_leak_position()
-                        if temp_pos is not None:
-                            all_estimated = [(temp_pos, temp_conf)]
-                else:
-                    # Si la méthode n'existe pas, utiliser estimate_leak_position comme fallback
-                    temp_pos, temp_conf = enhanced_detector.estimate_leak_position()
-                    if temp_pos is not None:
-                        all_estimated = [(temp_pos, temp_conf)]
-                
-                # IMPORTANT : La meilleure position (probabilité la plus élevée) est utilisée pour les métriques
-                # La liste est déjà triée par probabilité décroissante (première = meilleure)
-                if all_estimated:
-                    estimated_pos, estimation_confidence = all_estimated[0]  # Meilleure position pour statistiques
-                else:
-                    estimated_pos, estimation_confidence = enhanced_detector.estimate_leak_position()
-                gp_used = enhanced_detector.use_gp_validator
-                
-                # Statistiques du détecteur
-                detector_stats = enhanced_detector.get_statistics()
-                estimation_stable = detector_stats.get('estimation_stable', False)
-                
-                if estimated_pos is not None:
-                    # Utiliser la position estimée GP pour les métriques
-                    error_gp = np.linalg.norm(estimated_pos - np.array(true_leak_pos))
-                    if metrics.localization_accuracy:
-                        metrics.localization_accuracy.error_distance = error_gp
-                        metrics.localization_accuracy.detected_position = estimated_pos
-                else:
-                    error_gp = None
-                    estimation_confidence = 0.0
-                
-                elapsed_time = time.time() - start_time
-                total_detections += metrics.n_detections
-                total_time += elapsed_time
-                total_energy += info.get('total_energy', 0)
-                
-                # Précision basée sur l'erreur de localisation (GP si disponible)
-                if metrics.localization_accuracy and error_gp is not None:
-                    error_dist = error_gp
-                    # Précision = 100% si erreur < tolérance, sinon décroît
-                    if error_dist <= metrics.localization_accuracy.tolerance_radius:
-                        precision = 100 * (1 - error_dist / metrics.localization_accuracy.tolerance_radius)
-                        successful_detections += 1
-                    else:
-                        precision = max(0, 100 - 10 * (error_dist - metrics.localization_accuracy.tolerance_radius))
-                else:
-                    precision = 0
-                    error_dist = None
-                
-                total_precision += precision
-                
-                # Stocker les métriques détaillées pour cette itération
-                iteration_metrics = {
-                    'position_key': position_key,
-                    'iteration': iteration,
-                    'detections': metrics.n_detections,
-                    'time': elapsed_time,
-                    'energy': info.get('total_energy', 0),
-                    'precision': precision,
-                    'error_distance': error_dist if error_dist is not None else float('inf'),
-                    'gp_confidence': estimation_confidence,
-                    'gp_used': gp_used,
-                    'estimation_stable': estimation_stable,
-                    'success': precision > 70,  # Succès si précision > 70%
-                    'detection_rate': metrics.detection_rate if hasattr(metrics, 'detection_rate') else 0.0,
-                    'final_distance': metrics.localization_accuracy.final_distance if metrics.localization_accuracy else None
-                }
-                
-                # Ajouter à la liste globale
-                all_iteration_metrics.append(iteration_metrics)
-                
-            except Exception as e:
-                log_message(f"Erreur lors du test {position_key}, iteration {iteration+1}: {e}")
-                continue
-        
-        # Moyennes
-        avg_detections = total_detections / iterations
-        avg_time = total_time / iterations
-        avg_energy = total_energy / iterations
-        avg_precision = total_precision / iterations if iterations > 0 else 0
-        
-        # Calculer les statistiques détaillées depuis les métriques d'itération
-        # Filtrer les métriques pour cette position
-        pos_iterations = [m for m in all_iteration_metrics if m['position_key'] == position_key]
-        
-        if pos_iterations:
-            avg_error = np.mean([m['error_distance'] for m in pos_iterations if m['error_distance'] != float('inf')]) if pos_iterations else None
-            avg_gp_confidence = np.mean([m['gp_confidence'] for m in pos_iterations]) if pos_iterations else 0.0
-            gp_usage_rate = np.mean([1 if m['gp_used'] else 0 for m in pos_iterations]) * 100 if pos_iterations else 0.0
-            stability_rate = np.mean([1 if m['estimation_stable'] else 0 for m in pos_iterations]) * 100 if pos_iterations else 0.0
-            avg_detection_rate = np.mean([m['detection_rate'] for m in pos_iterations]) * 100 if pos_iterations else 0.0
-            avg_final_distance = np.mean([m['final_distance'] for m in pos_iterations if m['final_distance'] is not None]) if pos_iterations else None
-        else:
-            avg_error = None
-            avg_gp_confidence = 0.0
-            gp_usage_rate = 0.0
-            stability_rate = 0.0
-            avg_detection_rate = 0.0
-            avg_final_distance = None
-        
-        # Statut basé sur la précision et le taux de succès
-        success_rate = successful_detections / iterations if iterations > 0 else 0
-        if avg_precision > 85 and success_rate > 0.8:
-            status = "Reussi"
-        elif avg_precision > 70 and success_rate > 0.5:
-            status = "Partiel"
-        else:
-            status = "Echec"
-        
-        # Obtenir le mode d'affichage (utiliser test_mode_value de la boucle)
-        mode_display = get_mode_display_name(test_mode_value)
-        
-        # Informations sur les fuites détectées (moyenne sur toutes les itérations)
-        # Compter le nombre moyen de fuites détectées par itération
-        avg_n_leaks = len(all_detected_leaks_per_position) / iterations if iterations > 0 else 0
-        leaks_info = f"{avg_n_leaks:.1f} fuite(s)" if avg_n_leaks > 0 else "Aucune"
-        
-        test_results.append({
-            'position': position_key,
-            'mode': mode_display,
-            'detections': f"{avg_detections:.1f}",
-            'time': f"{avg_time:.2f}s",
-            'energy': f"{avg_energy:.1f}J",
-            'precision': f"{avg_precision:.1f}%",
-            'error_distance': f"{avg_error:.2f}m" if avg_error is not None and avg_error != float('inf') else "N/A",
-            'gp_confidence': f"{avg_gp_confidence:.1%}",
-            'gp_used': "Oui" if gp_usage_rate > 50 else "Non",
-            'stability': f"{stability_rate:.1f}%",
-            'detection_rate': f"{avg_detection_rate:.1f}%",
-            'final_distance': f"{avg_final_distance:.2f}m" if avg_final_distance is not None else "N/A",
-            'success_rate': f"{success_rate:.1%}",
-            'leaks_detected': leaks_info,
-            'n_leaks': f"{avg_n_leaks:.1f}",
-            'status': status
-        })
-        
-        log_message(f"   {position_key} ({mode_display}): {avg_precision:.1f}% précision, {avg_detections:.1f} détections, Erreur: {avg_error:.2f}m" if avg_error else f"   {position_key} ({mode_display}): {avg_precision:.1f}% précision, {avg_detections:.1f} détections")
-    
-    progress_bar.progress(1.0)
-    status_text.empty()
-    
-    st.session_state.test_results = test_results
-    log_message(f"Tests termines sur {len(test_results)} positions")
-    st.success(f"Tests terminés sur {len(test_results)} positions")
 
 def export_results():
     """Exporte les résultats avec métriques de performance"""
@@ -5305,19 +4702,6 @@ def export_results():
         key="btn_export_results"
     )
 
-def calculate_learning_efficiency(df):
-    """Calcule l'efficacité d'apprentissage"""
-    if len(df) < 100:
-        return 0.0
-    
-    detection_rate = df['detection'].mean()
-    early_reward = df['reward'].iloc[:50].mean()
-    late_reward = df['reward'].iloc[-50:].mean()
-    reward_improvement = (late_reward - early_reward) / abs(early_reward) if early_reward != 0 else 0
-    
-    efficiency = 0.6 * detection_rate + 0.4 * max(0, reward_improvement)
-    return efficiency
-
 def show_leak_positions_config():
     """Configuration des positions de fuites multiples"""
     st.markdown('<div class="subsection-header">Gestion des Positions de Fuites</div>', unsafe_allow_html=True)
@@ -5340,65 +4724,6 @@ def show_leak_positions_config():
             'active': True
         })
         st.success(f"Position ajoutée: ({new_x:.1f}, {new_y:.1f})")
-    
-    st.markdown("**Configurations Prédéfinies**")
-    col1, col2, col3, col4 = st.columns(4)
-    
-    with col1:
-        if st.button("Grille 3×3", use_container_width=True, key="btn_grid_3x3"):
-            st.session_state.leak_positions = []
-            for i in range(3):
-                for j in range(3):
-                    st.session_state.leak_positions.append({
-                        'x': 20 + i * 30,
-                        'y': 20 + j * 30,
-                        'intensity': 0.3,
-                        'active': True
-                    })
-            st.success("Grille 3×3 chargée (9 positions)")
-    
-    with col2:
-        if st.button("Positions Aléatoires", use_container_width=True, key="btn_random_pos"):
-            st.session_state.leak_positions = []
-            np.random.seed(42)
-            for _ in range(5):
-                st.session_state.leak_positions.append({
-                    'x': np.random.uniform(10, 90),
-                    'y': np.random.uniform(10, 90),
-                    'intensity': np.random.uniform(0.1, 0.5),
-                    'active': True
-                })
-            st.success("5 positions aléatoires générées")
-    
-    with col3:
-        if st.button("Ligne Horizontale", use_container_width=True, key="btn_line_horiz"):
-            st.session_state.leak_positions = []
-            for i in range(5):
-                st.session_state.leak_positions.append({
-                    'x': 20 + i * 15,
-                    'y': 50,
-                    'intensity': 0.3,
-                    'active': True
-                })
-            st.success("Ligne horizontale chargée (5 positions)")
-    
-    with col4:
-        if st.button("Configuration Circulaire", use_container_width=True, key="btn_circle_config"):
-            st.session_state.leak_positions = []
-            center_x, center_y = 50, 50
-            radius = 20
-            n_points = 8
-            for i in range(n_points):
-                angle = 2 * np.pi * i / n_points
-                x = center_x + radius * np.cos(angle)
-                y = center_y + radius * np.sin(angle)
-                st.session_state.leak_positions.append({
-                    'x': x,
-                    'y': y,
-                    'intensity': 0.3,
-                    'active': True
-                })
-            st.success("Configuration circulaire chargée (8 positions)")
     
     # Affichage des positions configurées
     if st.session_state.leak_positions:

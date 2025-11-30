@@ -49,13 +49,16 @@ D'après les tests expérimentaux et l'analyse détaillée :
 
 - **Taux de succès mission** : 85-90% (détection dans tolérance de 10m)
 - **Précision moyenne** : 1.8-2.1 mètres d'erreur
-- **Intelligence adaptative** : Apprentissage en temps réel
+- **Intelligence adaptative** : Apprentissage en temps réel avec stratégie adaptative Teacher-Student
 - **Validation automatique** : Comparaison position réelle vs détectée
 - **Validateur GP** : Estimation probabiliste de la position de fuite avec Processus Gaussiens
 - **Détection multi-fuites** : Détection de toutes les positions de fuite avec probabilité élevée sur la carte GP
 - **Extraction complète** : Retourne toutes les positions détectées (pas seulement la meilleure)
 - **Tri intelligent** : Positions triées par probabilité GP décroissante (meilleure en premier)
 - **Reconnaissance de zone** : Stratégie multi-phase pour convergence précise sans dépassement
+- **Stratégie adaptative** : Teacher et Student s'ajustent dynamiquement selon la confiance du Student
+- **Comparaison simplifiée** : Métriques dynamiques avec visualisations régénérées à chaque exécution
+- **Métriques enrichies** : Précision de localisation, confiance moyenne, temps de détection
 
 ## Architecture du Système
 
@@ -102,6 +105,9 @@ python launch_app.py
 - **Affichage complet** : Toutes les positions détectées affichées avec leur probabilité GP
 - **Tri automatique** : Positions triées par probabilité décroissante (meilleure en premier)
 - **Statistiques précises** : La meilleure position (probabilité la plus élevée) est utilisée pour les métriques
+- **Comparaison simplifiée** : Comparaison Naïve vs HIGHLIGHT+ avec métriques dynamiques
+- **Figures dynamiques** : Graphiques et trajectoires régénérés à chaque exécution
+- **Métriques enrichies** : Précision de localisation, confiance moyenne, temps de détection, score de précision
 - Export des résultats (JSON, rapports)
 - Métriques de performance conformes à l'analyse
 
@@ -170,9 +176,9 @@ Le système inclut un **validateur de performance** automatique qui :
 
 ## Équipe
 
-- **Housséni YABRE** - Etudiant en Informatique et Systèmes d'Information à l'UTT
-- **Kabinet SYLLA** - Etudiant en Informatique et Systèmes d'Information à l'UTT
-- **Nobert Bassooma DIDANERA** - Etudiant en fin de parcours IA et Big Data ( En mobilité à l'UTT)
+- **Housséni YABRE** - ETUDIANT en Informatique et Systèmes d'Information à l'UTT
+- **Kabinet SYLLA** - ETUDIANT en Informatique et Systèmes d'Information à l'UTT
+- **Nobert Bassooma DIDANERA** - Etudiant en fin de Master IA et Big Data, En mobilité à l'UTT
 
 ## Note Importante
 
@@ -188,6 +194,10 @@ Le système inclut un **validateur de performance** automatique qui :
 - **Statistiques optimisées** : La meilleure position (probabilité la plus élevée) est utilisée pour toutes les métriques
 - **Visualisation améliorée** : Carte de confiance GP en temps réel avec toutes les positions détectées clairement visibles
 - **Mode Teacher-Student amélioré** : Intégration complète GP + Teacher + Student pour détection optimale
+- **Stratégie adaptative** : Teacher et Student s'ajustent dynamiquement selon la confiance du Student (poids adaptatifs)
+- **Comparaison simplifiée** : Section dédiée avec métriques dynamiques calculées à partir des résultats réels
+- **Figures dynamiques** : Graphiques et trajectoires régénérés à chaque exécution pour refléter les dernières données
+- **Métriques enrichies** : Précision de localisation, confiance moyenne, temps de détection, score de précision (0-100)
 
 ## Licence
 

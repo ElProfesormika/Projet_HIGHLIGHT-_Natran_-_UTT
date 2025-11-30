@@ -148,6 +148,9 @@ class MethaneLeakValidator:
             uncertainty_penalty = np.where(relative_uncertainty > 0.5, 0.5, 1.0)
             combined_score = combined_score * uncertainty_penalty
             
+            # IMPORTANT : S'assurer que le score est dans [0, 1] (probabilité valide)
+            combined_score = np.clip(combined_score, 0.0, 1.0)
+            
             # Identifier les candidats au-dessus du seuil (seuil adaptatif)
             # Seuil plus bas si peu de mesures (détection plus précoce)
             adaptive_threshold = self.threshold_prob
@@ -160,7 +163,7 @@ class MethaneLeakValidator:
                 # Si aucun candidat au seuil, prendre le maximum du score combiné
                 idx_max = np.argmax(combined_score)
                 leak_pos = grid_points[idx_max]
-                leak_prob = float(combined_score[idx_max])
+                leak_prob = float(np.clip(combined_score[idx_max], 0.0, 1.0))  # Garantir [0, 1]
                 
                 # Seuil minimum pour confirmer (plus permissif si peu de mesures)
                 min_prob = 0.4 if len(self.X) < 10 else 0.5
@@ -174,12 +177,12 @@ class MethaneLeakValidator:
             idx_max_candidate = candidates[np.argmax(candidate_scores)]
             
             leak_pos = grid_points[idx_max_candidate]
-            leak_prob = float(combined_score[idx_max_candidate])
+            leak_prob = float(np.clip(combined_score[idx_max_candidate], 0.0, 1.0))  # Garantir [0, 1]
             
             # Stocker l'estimation
-            self.estimated_positions.append((leak_pos.copy(), float(leak_prob)))
+            self.estimated_positions.append((leak_pos.copy(), leak_prob))
             
-            return leak_pos, float(leak_prob)
+            return leak_pos, leak_prob
             
         except Exception as e:
             # En cas d'erreur, retourner None
@@ -240,21 +243,28 @@ class MethaneLeakValidator:
             uncertainty_penalty = np.where(relative_uncertainty > 0.5, 0.5, 1.0)
             combined_score = combined_score * uncertainty_penalty
             
-            # Identifier TOUS les candidats au-dessus du seuil
+            # IMPORTANT : S'assurer que le score est dans [0, 1] (probabilité valide)
+            # Ce score représente la probabilité GP : combinaison de concentration normalisée et confiance
+            combined_score = np.clip(combined_score, 0.0, 1.0)
+            
+            # IMPORTANT : Le combined_score est maintenant la probabilité GP finale
+            # Elle sera utilisée pour filtrer avec min_probability et retournée comme probabilité
+            
+            # Identifier TOUS les candidats au-dessus du seuil strict
+            # IMPORTANT : Respecter strictement le seuil min_probability (par défaut 0.75 = 75%)
             candidates = np.where(combined_score >= min_probability)[0]
             
-            if len(candidates) == 0:
-                # Si aucun candidat au seuil, prendre les meilleurs (top 5)
-                top_k = min(5, len(combined_score))
-                top_indices = np.argpartition(combined_score, -top_k)[-top_k:]
-                candidates = top_indices[combined_score[top_indices] >= 0.4]  # Seuil minimum absolu
-            
+            # Si aucun candidat ne respecte le seuil strict, retourner une liste vide
+            # Ne pas utiliser de fallback avec seuil plus bas pour éviter les faux positifs
             if len(candidates) == 0:
                 return []
             
             # Extraire les positions et probabilités
             candidate_positions = grid_points[candidates]
             candidate_probs = combined_score[candidates]
+            
+            # IMPORTANT : S'assurer que les probabilités sont dans [0, 1]
+            candidate_probs = np.clip(candidate_probs, 0.0, 1.0)
             
             # Trier par probabilité décroissante
             sorted_indices = np.argsort(candidate_probs)[::-1]
@@ -287,13 +297,24 @@ class MethaneLeakValidator:
                 group_probs = candidate_probs[group]
                 best_in_group_idx = group[np.argmax(group_probs)]
                 best_pos = candidate_positions[best_in_group_idx]
-                best_prob = candidate_probs[best_in_group_idx]
+                best_prob = float(np.clip(candidate_probs[best_in_group_idx], 0.0, 1.0))  # Garantir [0, 1]
                 
-                final_positions.append((best_pos.copy(), float(best_prob)))
+                # IMPORTANT : Vérifier que la probabilité respecte le seuil minimum AVANT d'ajouter
+                # Même si on a filtré avant, s'assurer après clustering (sécurité supplémentaire)
+                if best_prob >= min_probability:
+                    final_positions.append((best_pos.copy(), best_prob))
                 used_indices.update(group)
             
             # Trier par probabilité décroissante
             final_positions.sort(key=lambda x: x[1], reverse=True)
+            
+            # IMPORTANT : Filtrer strictement les positions avec probabilité >= min_probability
+            # Même après clustering, s'assurer que toutes les probabilités respectent le seuil
+            final_positions = [(pos, prob) for pos, prob in final_positions if prob >= min_probability]
+            
+            # Limiter à un maximum de 5 positions pour éviter trop de détections
+            if len(final_positions) > 5:
+                final_positions = final_positions[:5]
             
             return final_positions
             
@@ -305,11 +326,14 @@ class MethaneLeakValidator:
         """
         Génère une carte de confiance (probabilité) sur la grille
         
+        IMPORTANT : Utilise le même calcul de probabilité que get_all_leak_positions
+        pour garantir la cohérence (score combiné : 70% concentration + 30% confiance)
+        
         Args:
             resolution: Résolution de la grille (resolution x resolution)
             
         Returns:
-            (XX, YY, prob_map) - Grille et carte de probabilités
+            (XX, YY, prob_map) - Grille et carte de probabilités (score combiné GP)
         """
         if len(self.X) < 2:
             x_min, x_max, y_min, y_max = self.world_bounds
@@ -325,16 +349,39 @@ class MethaneLeakValidator:
             XX, YY = np.meshgrid(xx, yy)
             grid_points = np.c_[XX.ravel(), YY.ravel()]
             
-            mu, _ = self.gp.predict(grid_points, return_std=True)
+            # Prédiction GP avec incertitude (comme dans get_all_leak_positions)
+            mu, sigma = self.gp.predict(grid_points, return_std=True)
             
-            # Normalisation
+            # Calcul du score combiné (comme dans get_all_leak_positions)
+            # 70% concentration normalisée + 30% confiance
             mu_min = mu.min()
             mu_max = mu.max()
             if mu_max - mu_min < 1e-6:
-                prob_map = np.zeros_like(XX)
+                mu_normalized = np.zeros_like(mu)
             else:
-                prob = (mu - mu_min) / (mu_max - mu_min + 1e-6)
-                prob_map = prob.reshape(XX.shape)
+                mu_normalized = (mu - mu_min) / (mu_max - mu_min + 1e-6)
+            
+            # Normaliser l'incertitude (0-1, inversé : faible incertitude = haute confiance)
+            sigma_max = sigma.max()
+            if sigma_max < 1e-6:
+                confidence = np.ones_like(sigma)
+            else:
+                confidence = 1.0 - (sigma / (sigma_max + 1e-6))
+                confidence = np.clip(confidence, 0.0, 1.0)
+            
+            # Score combiné : 70% concentration + 30% confiance (comme get_all_leak_positions)
+            combined_score = 0.7 * mu_normalized + 0.3 * confidence
+            
+            # Filtrer les zones avec trop d'incertitude relative
+            relative_uncertainty = sigma / (np.abs(mu) + 1e-6)
+            uncertainty_penalty = np.where(relative_uncertainty > 0.5, 0.5, 1.0)
+            combined_score = combined_score * uncertainty_penalty
+            
+            # IMPORTANT : S'assurer que le score est dans [0, 1] (probabilité valide)
+            combined_score = np.clip(combined_score, 0.0, 1.0)
+            
+            # Reshape pour la carte
+            prob_map = combined_score.reshape(XX.shape)
             
             return XX, YY, prob_map
             
