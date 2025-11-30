@@ -62,38 +62,31 @@ D'après les tests expérimentaux et l'analyse détaillée :
 
 ## Architecture du Système
 
-```
-highlight_plus/
-├── models/           # Modèles IA (Teacher & Student)
-│   ├── teacher_gp.py    # Expert - Processus Gaussiens
-│   └── student_rl.py    # Apprenti - RL + Distillation
-├── simulation/       # Simulateur physique et environnement
-│   ├── environment.py   # Environnement Gymnasium
-│   └── plume_model.py   # Modèle de panache de méthane
-├── sensors/          # Simulateur de capteurs TDLAS
-│   └── tdlas_sensor.py  # Capteur laser avec bruit réaliste
-├── analysis/         # Analyse et validation
-│   ├── enhanced_detector.py      # Détecteur multi-critères
-│   ├── methane_leak_validator.py # Validateur GP pour position de fuite
-│   ├── performance_validator.py # Validation de performance
-│   └── learning_analysis.py      # Analyse de l'apprentissage
-├── experiments/      # Scripts d'expérimentation
-│   ├── run_comparison.py  # Comparaisons expérimentales
-│   └── leak_position_test.py # Tests de robustesse
-├── visualization/    # Outils de visualisation
-│   └── plotter.py   # Graphiques et animations
-└── utils/           # Utilitaires et helpers
-    └── config_loader.py # Chargement de configuration
-```
+Le projet est organisé en modules Python modulaires :
+
+- **`highlight_plus/models/`** : Modèles IA (Teacher GP & Student RL)
+- **`highlight_plus/simulation/`** : Simulateur physique et environnement Gymnasium
+- **`highlight_plus/sensors/`** : Simulateur de capteurs TDLAS avec bruit réaliste
+- **`highlight_plus/analysis/`** : Analyse, validation et détection multi-critères
+- **`highlight_plus/experiments/`** : Scripts d'expérimentation et comparaisons
+- **`highlight_plus/visualization/`** : Outils de visualisation et graphiques
+- **`highlight_plus/utils/`** : Utilitaires et chargement de configuration
+- **`highlight_plus/gui/`** : Interface graphique PyQt (alternative à Streamlit)
+- **`highlight_plus/data/`** : Chargeur de données réelles pour validation
 
 ## Utilisation
 
 ### Interface Streamlit (Recommandé)
 
 ```bash
+# Méthode 1 : Directement avec Streamlit
 streamlit run streamlit_app.py
-# OU
+
+# Méthode 2 : Via le lanceur Python
 python launch_app.py
+
+# Méthode 3 : Sur Windows, utiliser le script batch
+restart_streamlit.bat
 ```
 
 **Fonctionnalités de l'interface :**
@@ -114,19 +107,32 @@ python launch_app.py
 ### Démonstration en Ligne de Commande
 
 ```bash
-# Démonstration complète
+# Démonstration complète avec résultats sauvegardés
 python demo.py
 ```
+
+Les résultats sont sauvegardés dans `demo_results/comparison_results.json`.
 
 ### Expérimentations
 
 ```bash
 # Comparaison complète Teacher vs Student vs Baselines
-python highlight_plus/experiments/run_comparison.py
+python -m highlight_plus.experiments.run_comparison
 
 # Tests de robustesse sur multiples positions
-python highlight_plus/experiments/leak_position_test.py
+python -m highlight_plus.experiments.leak_position_test
+
+# Test comparatif complet
+python -m highlight_plus.experiments.comparative_test
 ```
+
+### Configuration
+
+Le fichier de configuration principal se trouve dans `configs/default.yaml`. Il permet de configurer :
+- Paramètres du panache de méthane
+- Caractéristiques du capteur TDLAS
+- Paramètres du drone (vitesse, altitude, consommation énergétique)
+- Hyperparamètres des modèles IA (Teacher GP et Student RL)
 
 ## Métriques de Performance
 
@@ -164,15 +170,10 @@ Le système inclut un **validateur de performance** automatique qui :
 
 ## Documentation
 
-- **[RAPPORT_PRESENTATION_DETAILLE.md](RAPPORT_PRESENTATION_DETAILLE.md)** - Rapport de présentation détaillé (LaTeX disponible)
-- **[RAPPORT_AVANCEMENT_BREF.md](RAPPORT_AVANCEMENT_BREF.md)** - Rapport d'avancement bref pour suiveurs
-- **[DIFFERENCES_MODES.md](DIFFERENCES_MODES.md)** - Explication des différences entre les modes de simulation
-- **[MODELE_TRAJECTOIRE_DRONE.md](MODELE_TRAJECTOIRE_DRONE.md)** - Explication du modèle de trajectoire du drone
-- **[NOUVELLES_FONCTIONNALITES.md](NOUVELLES_FONCTIONNALITES.md)** - Récapitulatif des fonctionnalités principales
-- **[PRESENTATION_CONCOURS.md](PRESENTATION_CONCOURS.md)** - Présentation complète pour le concours
-- **[LIVRABLES_CONCOURS.md](LIVRABLES_CONCOURS.md)** - Liste des livrables et guide d'utilisation
-- **[VALIDATION_PERFORMANCE.md](VALIDATION_PERFORMANCE.md)** - Documentation du système de validation
+- **[DOCUMENTATION_FONCTIONS_VARIABLES.md](DOCUMENTATION_FONCTIONS_VARIABLES.md)** - Documentation complète de toutes les fonctions et variables du projet
 - **[ANALYSE_APPRENTISSAGE_IA.md](ANALYSE_APPRENTISSAGE_IA.md)** - Analyse détaillée de l'IA et des performances
+- **[MODELE_TRAJECTOIRE_DRONE.md](MODELE_TRAJECTOIRE_DRONE.md)** - Explication du modèle de trajectoire du drone
+- **[DIFFERENCES_MODES.md](DIFFERENCES_MODES.md)** - Explication des différences entre les modes de simulation
 
 ## Équipe
 
@@ -180,9 +181,42 @@ Le système inclut un **validateur de performance** automatique qui :
 - **Kabinet SYLLA** - ETUDIANT en Informatique et Systèmes d'Information à l'UTT
 - **Nobert Bassooma DIDANERA** - Etudiant en fin de Master IA et Big Data, En mobilité à l'UTT
 
+## Contact
+
+Pour toute question ou information complémentaire :
+- **Email** : housseni.yabre@utt.fr
+
+## Structure du Projet
+
+```
+Natran_x_UTT/
+├── highlight_plus/          # Package principal
+│   ├── models/              # Modèles IA (Teacher GP & Student RL)
+│   ├── simulation/         # Simulateur physique et environnement
+│   ├── sensors/            # Simulateur de capteurs TDLAS
+│   ├── analysis/           # Analyse et validation
+│   ├── experiments/        # Scripts d'expérimentation
+│   ├── visualization/      # Outils de visualisation
+│   ├── utils/              # Utilitaires et helpers
+│   ├── gui/                # Interface graphique (PyQt)
+│   └── data/               # Chargeur de données réelles
+├── configs/                # Fichiers de configuration
+│   └── default.yaml        # Configuration par défaut
+├── demo_results/            # Résultats des démonstrations
+├── streamlit_app.py        # Interface Streamlit principale
+├── launch_app.py           # Lanceur de l'application
+├── demo.py                 # Script de démonstration
+├── restart_streamlit.bat   # Script de redémarrage (Windows)
+├── requirements.txt        # Dépendances Python
+├── LICENSE                 # Licence MIT
+├── logo_UTT.png           # Logo UTT
+├── logo_natran.png        # Logo NATRAN
+└── README.md              # Ce fichier
+```
+
 ## Note Importante
 
-**Résultats en simulation** : Tous les résultats présentés sont obtenus en simulation avec validation automatique. Pour validation terrain, voir la feuille de route dans [PRESENTATION_CONCOURS.md](PRESENTATION_CONCOURS.md).
+**Résultats en simulation** : Tous les résultats présentés sont obtenus en simulation avec validation automatique.
 
 **Fiabilité** : Le système inclut une validation automatique qui compare les positions détectées avec les positions réelles configurées, permettant de prouver la fiabilité du modèle.
 
