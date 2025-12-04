@@ -209,37 +209,94 @@ Step 3           : [10.25, 10.75, 5.0] (vitesse: [-2.5, 2.5, 0.0] m/s)
 
 ### Mode Simple
 - Actions calculées directement à partir de la direction vers la cible et du gradient
+- Navigation multi-phase basique
 
 ### Mode Teacher (GP)
 - Le Teacher suggère un point suivant via `select_next_point()`
 - Conversion en action normalisée pour le déplacement
+- Utilise la fonction d'acquisition UCB améliorée
+- Navigation guidée par estimation GP
 
 ### Mode Teacher-Student (RL)
 - Le Student (RL) génère des actions via `select_action()`
 - Les actions peuvent être mélangées avec les suggestions du Teacher
 - Apprentissage progressif de la politique de navigation
+- Stratégie adaptative avec poids dynamiques
+
+### Stratégie Multi-Phase
+
+Tous les modes utilisent une stratégie multi-phase :
+
+1. **Phase 1 : Exploration** (distance > 25m)
+   - Navigation rapide vers la zone de recherche
+   - Utilisation de l'estimation GP si disponible
+
+2. **Phase 2 : Convergence** (distance 10-25m)
+   - Approche guidée avec mélange de plusieurs directions :
+     - Direction Teacher (GP)
+     - Direction Student (RL) si disponible
+     - Direction gradient
+     - Direction vers le centre estimé
+   - Utilisation de l'estimation GP du validateur
+
+3. **Phase 3 : Recherche Locale** (distance < 10m)
+   - Recherche en spirale autour de la source estimée
+   - Combinaison de toutes les stratégies
+   - Convergence fine vers la position exacte
 
 ---
 
-## 10. Caractéristiques du Modèle
+## 10. Calcul de la Vitesse par Rapport à l'Air
 
-### ✅ Avantages
+Pour le calcul de la consommation énergétique, la vitesse par rapport à l'air est calculée :
+
+```python
+# Vitesse du drone par rapport au sol
+speed_ground = np.linalg.norm(self.drone_velocity[:2])
+
+# Vitesse du vent (du modèle de panache)
+wind_vector = self.plume._wind_vector
+wind_speed = np.linalg.norm(wind_vector)
+
+# Vitesse par rapport à l'air (vecteur)
+air_velocity = self.drone_velocity[:2] - np.array(wind_vector)
+v_air = np.linalg.norm(air_velocity)
+```
+
+### Formule
+
+**v_air** = ||**v_drone** - **u_vent**||
+
+où :
+- **v_drone** : Vitesse du drone par rapport au sol (m/s)
+- **u_vent** : Vecteur vitesse du vent (m/s)
+- **v_air** : Vitesse par rapport à l'air (m/s)
+
+Cette vitesse est utilisée dans le calcul de la puissance consommée.
+
+---
+
+## 11. Caractéristiques du Modèle
+
+### Avantages
 
 1. **Simplicité** : Modèle discret facile à implémenter
 2. **Contrôle précis** : Actions normalisées permettent un contrôle fin
 3. **Contraintes intégrées** : Limites physiques appliquées automatiquement
 4. **Temps réel** : Pas de temps fixe pour simulation en temps réel
 5. **Traçabilité** : Trajectoire complète stockée pour analyse
+6. **Compatibilité RL** : Format standard pour l'apprentissage par renforcement
 
-### ⚠️ Limitations
+### Limitations
 
 1. **Modèle simplifié** : Pas de dynamique complexe (accélération, inertie)
-2. **Pas de vent** : Le vent n'affecte pas directement le mouvement (seulement le panache)
+2. **Vent indirect** : Le vent n'affecte pas directement le mouvement (seulement le panache et la consommation)
 3. **Mouvement instantané** : Pas de délai de réponse du drone
+4. **Pas de contraintes dynamiques** : Pas de limites d'accélération ou de décélération
 
 ---
 
-## 11. Utilisation pour la Visualisation
+## 12. Utilisation pour la Visualisation
 
 La trajectoire stockée dans `self.trajectory` est utilisée pour :
 
@@ -247,6 +304,26 @@ La trajectoire stockée dans `self.trajectory` est utilisée pour :
 2. **Analyse comparative** : Comparaison entre différentes stratégies (Naïve vs HIGHLIGHT+)
 3. **Métriques de performance** : Calcul de la distance parcourue, efficacité énergétique
 4. **Cartes de confiance GP** : Superposition de la trajectoire sur les cartes de concentration
+5. **Validation** : Comparaison avec les trajectoires optimales théoriques
+
+---
+
+## 13. Intégration avec la Consommation Énergétique
+
+Le modèle de trajectoire est directement lié au calcul de la consommation énergétique :
+
+```python
+# Calcul de la puissance
+P = P_base + c1 * v_air^3 + c2 * |dh/dt|
+
+# Énergie consommée
+E = P × time_step
+```
+
+où :
+- `v_air` : Vitesse par rapport à l'air (calculée à partir de la trajectoire)
+- `dh/dt` : Taux de changement d'altitude (dérivé de la trajectoire)
+- `time_step` : Pas de temps de la simulation
 
 ---
 
@@ -254,3 +331,4 @@ La trajectoire stockée dans `self.trajectory` est utilisée pour :
 
 Le modèle de trajectoire du drone dans HIGHLIGHT+ est un **modèle discret basé sur des actions normalisées**, avec conversion en déplacements réels et application de contraintes physiques. Il permet une simulation efficace et contrôlable, adaptée à l'apprentissage par renforcement et à l'optimisation de trajectoires pour la détection de fuites de méthane.
 
+Le système intègre parfaitement les différents modes de navigation (simple, teacher_student, full_learning) et permet une analyse détaillée des performances grâce au stockage complet de la trajectoire.
