@@ -752,7 +752,6 @@ highlight_plus/
 ```
 
 ---
-
-*Analyse générée le : 2025-01-27*  
+ 
 *Projet : HIGHLIGHT+ - Concours Innovation Natran x UTT*  
 *Version : 1.0 - Analyse Complète*

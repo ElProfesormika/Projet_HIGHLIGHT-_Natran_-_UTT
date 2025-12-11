@@ -1395,9 +1395,8 @@ Configuration → Session State → Simulation → Results → Display
 
 ## Version
 
-**Document créé le** : 2025  
+**Document créé en** : Décembre 2025  
 **Version du système** : 1.0.0  
-**Dernière mise à jour** : 2025
 
 ---
 
@@ -1410,7 +1409,7 @@ Pour toute question ou clarification sur cette documentation, veuillez consulter
 - Kabinet SYLLA - ETUDIANT en Informatique et Systèmes d'Information à l'UTT
 - Nobert Bassooma DIDANERA - Etudiant en fin de Master IA et Big Data, En mobilité à l'UTT
 
-**Email** : housseni.yabre@utt.fr
+**Email** : housseni.yabre@utt.fr , kabinet.sylla@utt.fr , bassooma_norbert.didanera@utt.fr
 
 ---
 
