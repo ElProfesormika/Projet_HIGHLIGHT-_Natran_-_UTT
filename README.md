@@ -184,7 +184,7 @@ Le système inclut un **validateur de performance** automatique qui :
 ## Contact
 
 Pour toute question ou information complémentaire :
-- **Email** : housseni.yabre@utt.fr
+- **Email** : housseni.yabre@utt.fr , kabinet.sylla@utt.fr , bassooma_norbert.didanera@utt.fr
 
 ## Structure du Projet
 
