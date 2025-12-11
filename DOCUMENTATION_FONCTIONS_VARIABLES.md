@@ -1394,9 +1394,9 @@ Configuration → Session State → Simulation → Results → Display
 ---
 
 ## Version
-
-**Document créé en** : Décembre 2025  
+ 
 **Version du système** : 1.0.0  
+**Dernière mise à jour** : Décembre 2025 
 
 ---
 
