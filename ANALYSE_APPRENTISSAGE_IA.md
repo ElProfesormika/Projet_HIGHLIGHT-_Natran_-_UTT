@@ -6,6 +6,47 @@ HIGHLIGHT+ utilise une **architecture Teacher-Student** combinant deux approches
 
 **Objectif principal** : Maximiser le taux de détection tout en minimisant la consommation énergétique et le temps de mission.
 
+**Architecture complète du système :**
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    ENVIRONNEMENT DE SIMULATION               │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐     │
+│  │ Modèle       │  │ Capteur      │  │ Contraintes  │     │
+│  │ Panache      │  │ TDLAS        │  │ Drone        │     │
+│  │ (Gaussien)   │  │ (Beer-Lambert)│  │ (Vitesse,    │     │
+│  │              │  │              │  │  Altitude)    │     │
+│  └──────────────┘  └──────────────┘  └──────────────┘     │
+└─────────────────────────────────────────────────────────────┘
+                            ↓
+┌─────────────────────────────────────────────────────────────┐
+│              ARCHITECTURE TEACHER-STUDENT                    │
+│  ┌──────────────────────┐      ┌──────────────────────┐    │
+│  │ TEACHER (Expert)     │      │ STUDENT (Apprenti)    │    │
+│  │ Processus Gaussiens  │◄─────►│ RL + Distillation     │    │
+│  │ - Apprentissage actif│      │ - Réseau de neurones  │    │
+│  │ - Fonction UCB       │      │ - Replay Buffer       │    │
+│  │ - Sélection optimale │      │ - Perte combinée      │    │
+│  └──────────────────────┘      └──────────────────────┘    │
+└─────────────────────────────────────────────────────────────┘
+                            ↓
+┌─────────────────────────────────────────────────────────────┐
+│              DÉTECTION ET VALIDATION                          │
+│  ┌──────────────────────┐      ┌──────────────────────┐    │
+│  │ Enhanced Detector    │      │ GP Validator          │    │
+│  │ - Multi-critères    │      │ - Estimation position │    │
+│  │ - Confiance          │      │ - Probabilité GP       │    │
+│  └──────────────────────┘      └──────────────────────┘    │
+└─────────────────────────────────────────────────────────────┘
+                            ↓
+┌─────────────────────────────────────────────────────────────┐
+│              VALIDATION DE PERFORMANCE                        │
+│  - Métriques de détection                                     │
+│  - Précision de localisation                                  │
+│  - Efficacité énergétique                                     │
+│  - Score global (0-100)                                       │
+└─────────────────────────────────────────────────────────────┘
+```
+
 ---
 
 ##  Comment Fonctionne la Partie Apprentissage IA
@@ -330,30 +371,144 @@ Output (Action) : Linear(128 → 3) + Tanh
    - Échantillonnage uniforme pour briser la corrélation temporelle
 
 3. **Apprentissage hors-ligne (DQN-like)** :
-   - **Condition de démarrage** : Apprentissage commence après `learning_starts` expériences (par défaut 1000)
-   - **Échantillonnage** : Batch de 64 expériences aléatoires (configurable)
-   - **Calcul de la perte RL** :
-     ```
-     Q_current = π_θ(s)
-     Q_target = r + γ * π_target(s')
-     L_RL = MSE(Q_current, Q_target)
-     ```
-   - **Calcul de la perte de distillation** :
-     ```
-     L_KL = MSE(π_teacher(s), π_student(s))
-     ```
-     - Calculée toutes les 10 étapes (`teacher_update_freq`)
-     - Température de distillation : 3.0 (configurable)
-   - **Perte totale** :
-     ```
-     L = L_RL + λ·L_KL
-     ```
-     - `λ = 0.1` : Poids de la distillation (configurable)
-   - **Optimisation** :
-     - Optimiseur : Adam (learning_rate = 3e-4, configurable)
-     - Gradient clipping : max_norm = 1.0 (stabilité)
-     - Rétropropagation standard
-     - Apprentissage à chaque étape après `learning_starts` expériences
+   
+   **Condition de démarrage** : 
+   - Apprentissage commence après `learning_starts` expériences (par défaut 1000)
+   - Nécessite un minimum d'expériences pour briser la corrélation temporelle
+   
+   **Échantillonnage** : 
+   - Batch de 64 expériences aléatoires (configurable)
+   - Échantillonnage uniforme depuis le replay buffer
+   - Briser la corrélation temporelle pour stabilité
+   
+   **Calcul de la perte RL (Policy-based)** :
+   
+   Le Student utilise une approche **policy-based** (pas Q-learning) :
+   
+   ```
+   # Prédictions actuelles (réseau principal)
+   Q_current = π_θ(s)  # Actions prédites par le réseau principal
+   
+   # Prédictions cibles (réseau cible)
+   with torch.no_grad():
+       Q_next = π_θ_target(s')  # Actions prédites par le réseau cible
+       Q_target = r + γ × Q_next × (1 - done)
+       # done = 1 si épisode terminé, 0 sinon
+   
+   # Perte MSE
+   L_RL = MSE(Q_current, Q_target)
+        = (1/batch_size) × Σ(Q_current - Q_target)²
+   ```
+   
+   **Détails** :
+   - `π_θ(s)` : Réseau principal (policy network)
+   - `π_θ_target(s')` : Réseau cible (target network)
+   - `γ = 0.99` : Facteur de discount (valeur future)
+   - `r` : Récompense observée
+   - `done` : Flag de terminaison (1 si épisode terminé)
+   - Si `done = 1` : `Q_target = r` (pas de valeur future)
+   - Si `done = 0` : `Q_target = r + γ × Q_next` (valeur future incluse)
+   
+   **Exemple numérique** :
+   - État : `s = [0.5, 0.3, 0.2, ...]` (16 dimensions)
+   - Action prédite : `Q_current = [0.8, -0.3, 0.0]`
+   - Récompense : `r = 10.0`
+   - État suivant : `s' = [0.6, 0.4, 0.2, ...]`
+   - Action cible : `Q_next = [0.7, -0.2, 0.0]`
+   - `done = 0` (épisode continue)
+   - `Q_target = 10.0 + 0.99 × [0.7, -0.2, 0.0] = [10.693, 9.802, 10.0]`
+   - Perte : `L_RL = MSE([0.8, -0.3, 0.0], [10.693, 9.802, 10.0])`
+     - `= (1/3) × ((0.8-10.693)² + (-0.3-9.802)² + (0.0-10.0)²)`
+     - `= (1/3) × (97.7 + 102.1 + 100.0)`
+     - `= 99.9`
+   
+   **Calcul de la perte de distillation** :
+   
+   La distillation de connaissance force le Student à imiter le Teacher :
+   
+   ```
+   # Actions du Student
+   student_actions = π_θ(s)  # [batch_size, 3]
+   
+   # Actions du Teacher (simulées depuis l'état)
+   teacher_actions = get_teacher_actions(s)  # [batch_size, 3]
+   
+   # Perte KL (approximée par MSE)
+   L_KL = MSE(student_actions, teacher_actions)
+        = (1/batch_size) × Σ(π_θ(s) - π_teacher(s))²
+   ```
+   
+   **Détails** :
+   - Calculée toutes les 10 étapes (`teacher_update_freq = 10`)
+   - Température de distillation : `T = 3.0` (configurable, actuellement non utilisée dans l'implémentation)
+   - Dans une version avancée, on utiliserait : `L_KL = KL(π_teacher(s)/T || π_student(s)/T)`
+   
+   **Simulation des actions Teacher** :
+   
+   Le Teacher ne produit pas directement des actions, donc on les simule depuis l'état :
+   
+   ```
+   for each state s in batch:
+       # Extraire position et gradient depuis l'état normalisé
+       pos_x = s[0] × world_width  # Dénormalisation
+       pos_y = s[1] × world_height
+       grad_x = s[8]  # Gradient X normalisé
+       grad_y = s[9]  # Gradient Y normalisé
+       
+       # Action basée sur le gradient (direction vers la source)
+       action_x = clip(grad_x, -1, 1)
+       action_y = clip(grad_y, -1, 1)
+       action_z = 0.0  # Pas de mouvement vertical
+       
+       teacher_actions[i] = [action_x, action_y, action_z]
+   ```
+   
+   **Perte totale** :
+   ```
+   L_total = L_RL + λ × L_KL
+   ```
+   
+   où :
+   - `λ = 0.1` : Poids de la distillation (configurable via `lambda_kl`)
+   - `L_RL` : Perte d'apprentissage par renforcement
+   - `L_KL` : Perte de distillation (0 si pas de Teacher ou si `step_count % teacher_update_freq != 0`)
+   
+   **Exemple numérique** :
+   - `L_RL = 99.9`
+   - `L_KL = 0.5` (calculée cette étape)
+   - `λ = 0.1`
+   - **Perte totale** : `L_total = 99.9 + 0.1 × 0.5 = 99.95`
+   
+   **Optimisation** :
+   
+   ```
+   # 1. Zéro des gradients
+   optimizer.zero_grad()
+   
+   # 2. Rétropropagation
+   L_total.backward()
+   
+   # 3. Gradient clipping (stabilité)
+   clip_grad_norm(parameters, max_norm=1.0)
+   
+   # 4. Mise à jour des paramètres
+   optimizer.step()
+   ```
+   
+   **Détails de l'optimiseur** :
+   - **Type** : Adam (Adaptive Moment Estimation)
+   - **Learning rate** : `lr = 3e-4` (configurable)
+   - **Gradient clipping** : `max_norm = 1.0` (évite l'explosion des gradients)
+   - **Mise à jour** : À chaque étape après `learning_starts` expériences
+   
+   **Mise à jour du réseau cible** :
+   
+   Toutes les 100 étapes (`target_update_freq = 100`) :
+   ```
+   θ_target ← θ  # Copie complète des poids
+   ```
+   
+   Cela stabilise l'apprentissage en utilisant des valeurs cibles fixes pendant plusieurs étapes.
 
 4. **Mise à jour du réseau cible** :
    - Toutes les 100 étapes (`target_update_freq`, configurable)
@@ -414,75 +569,149 @@ Le système optimise une fonction multi-objectifs qui combine gain d'information
 R(s,a) = α · ΔI(M_GP) - β · E(s,a) + R_detection + R_boundary
 ```
 
+**Formule complète développée :**
+
+```
+R(s,a) = α × (1 / (1 + σ_GP(x,y))) 
+       - β × (P_base + c₁ × v_air³ + c₂ × |dh/dt|) × Δt
+       + R_detection × I(detected)
+       - R_boundary × I(out_of_bounds)
+```
+
+où :
+- `α = 10.0` : Poids du gain d'information
+- `β = 0.1` : Poids de la pénalité énergétique
+- `σ_GP(x,y)` : Incertitude du GP à la position (x, y)
+- `P_base = 100 W` : Puissance de base
+- `c₁ = 2.0 W·s²/m³` : Coefficient vitesse
+- `c₂ = 25.0 W·s/m` : Coefficient altitude
+- `v_air` : Vitesse relative par rapport à l'air (m/s)
+- `dh/dt` : Taux de changement d'altitude (m/s)
+- `Δt = 0.1 s` : Pas de temps
+- `R_detection = 10.0` : Bonus de détection
+- `R_boundary = 5.0` : Pénalité hors limites
+- `I(condition)` : Fonction indicatrice (1 si condition vraie, 0 sinon)
+
 **Composantes détaillées :**
 
 1. **Gain d'information** : `ΔI(M_GP) = 1 / (1 + uncertainty)`
-   - **Calcul détaillé** :
-     ```
-     Si Teacher GP disponible et entraîné :
-         X_pred = [[x, y]]  # Position actuelle
-         _, std = teacher.gp.predict(X_pred, return_std=True)
-         uncertainty = std[0]  # Incertitude à la position actuelle
-         information_gain = 1.0 / (1.0 + uncertainty)
-     Sinon (GP non entraîné) :
-         gradient_magnitude = sqrt(grad_x² + grad_y²)
-         information_gain = gradient_magnitude  # Proxy du gain d'information
-     ```
-   - **Exemple numérique** :
-     - Incertitude GP = 0.2 → `ΔI = 1/(1+0.2) = 0.83`
-     - Incertitude GP = 0.5 → `ΔI = 1/(1+0.5) = 0.67`
-     - Incertitude GP = 1.0 → `ΔI = 1/(1+1.0) = 0.5`
+   
+   **Calcul détaillé** :
+   ```
+   Si Teacher GP disponible et entraîné (≥ 2 observations) :
+       X_pred = [[x, y]]  # Position actuelle du drone
+       mean, std = teacher.gp.predict(X_pred, return_std=True)
+       uncertainty = std[0]  # Incertitude à la position actuelle
+       information_gain = 1.0 / (1.0 + uncertainty)
+   Sinon (GP non entraîné ou < 2 observations) :
+       gradient_magnitude = sqrt(grad_x² + grad_y²)
+       information_gain = gradient_magnitude  # Proxy du gain d'information
+   ```
+   
+   **Interprétation** :
+   - Plus l'incertitude est faible, plus le gain d'information est élevé
+   - `uncertainty = 0` → `ΔI = 1.0` (gain maximal)
+   - `uncertainty → ∞` → `ΔI → 0` (gain minimal)
+   
+   **Exemple numérique** :
+   - Incertitude GP = 0.2 → `ΔI = 1/(1+0.2) = 0.833`
+   - Incertitude GP = 0.5 → `ΔI = 1/(1+0.5) = 0.667`
+   - Incertitude GP = 1.0 → `ΔI = 1/(1+1.0) = 0.5`
+   - Incertitude GP = 2.0 → `ΔI = 1/(1+2.0) = 0.333`
+   
    - **Poids** : `α = 10.0` (configurable via `config.detection_bonus`)
    - **Contribution à la récompense** : `+10.0 × ΔI` points
+   - **Exemple** : `ΔI = 0.833` → `+8.33` points
 
-2. **Coût énergétique** : `E(s,a) = P_base + c₁·v_air³ + c₂·|dh/dt|`
+2. **Coût énergétique** : `E(s,a) = P × Δt`
    
    **Calcul détaillé de la puissance** :
    ```
    # 1. Vitesse par rapport à l'air
-   v_drone_ground = drone_velocity[:2]  # Vitesse horizontale du drone
-   u_vent = plume._wind_vector  # Vecteur vitesse du vent
-   v_air_vector = v_drone_ground - u_vent
+   v_drone_ground = drone_velocity[:2]  # Vitesse horizontale du drone (vx, vy)
+   u_vent = plume._wind_vector  # Vecteur vitesse du vent (ux, uy)
+   v_air_vector = v_drone_ground - u_vent  # Vitesse relative
    v_air = ||v_air_vector||  # Norme de la vitesse relative
    
-   # 2. Coefficient vitesse
+   # 2. Coefficient vitesse (dépendance cubique)
    c₁ = speed_coefficient / max_speed²
       = 50.0 / (5.0)²
       = 50.0 / 25.0
       = 2.0 W·s²/m³
    
    # 3. Taux de changement d'altitude
-   dh_dt = |drone_velocity[2]|  # Vitesse verticale absolue
+   dh_dt = |drone_velocity[2]|  # Vitesse verticale absolue |vz|
    
-   # 4. Puissance totale
-   P = base_power + c₁ × v_air³ + c₂ × dh_dt
+   # 4. Puissance totale selon modèle aérodynamique
+   P = P_base + c₁ × v_air³ + c₂ × dh_dt
      = 100.0 + 2.0 × v_air³ + 25.0 × dh_dt
    
-   # 5. Énergie consommée
-   E = P × time_step
+   # 5. Énergie consommée sur le pas de temps
+   E = P × Δt
      = P × 0.1  # Joules
    ```
    
-   **Exemple numérique** :
-   - Vitesse drone : (3, 2) m/s
-   - Vitesse vent : (1, 0) m/s
-   - Vitesse relative : `v_air = ||(2, 2)|| = √8 ≈ 2.83 m/s`
+   **Justification physique** :
+   - **Dépendance cubique en vitesse** : La traînée aérodynamique est proportionnelle à `v²`, et la puissance (force × vitesse) est donc proportionnelle à `v³`
+   - **Coût d'altitude** : Les changements d'altitude nécessitent de l'énergie supplémentaire (gravité, stabilisation)
+   
+   **Exemple numérique complet** :
+   - Vitesse drone : `(3, 2) m/s`
+   - Vitesse vent : `(1, 0) m/s`
+   - Vitesse relative : `v_air = ||(2, 2)|| = √(4+4) = √8 ≈ 2.83 m/s`
    - Vitesse verticale : `dh_dt = 0.5 m/s`
-   - Puissance : `P = 100 + 2.0 × (2.83)³ + 25.0 × 0.5 = 100 + 45.3 + 12.5 = 157.8 W`
+   - Puissance : `P = 100 + 2.0 × (2.83)³ + 25.0 × 0.5`
+     - `= 100 + 2.0 × 22.65 + 12.5`
+     - `= 100 + 45.3 + 12.5`
+     - `= 157.8 W`
    - Énergie : `E = 157.8 × 0.1 = 15.78 J`
    
    - **Poids** : `β = |energy_penalty| = 0.1` (configurable)
-   - **Contribution à la récompense** : `-0.1 × E` points (dans l'exemple : `-1.578` points)
+   - **Contribution à la récompense** : `-0.1 × E` points
+   - **Exemple** : `E = 15.78 J` → `-1.578` points
 
 3. **Récompenses spécifiques** :
-   - [OK] **Détection de fuite** : +10 points (`detection_bonus`, configurable)
-   - [OK] **Gain d'information** : +10 × ΔI (continu, via `alpha`)
-   - [OK] **Consommation d'énergie** : -0.1 × énergie (continu, via `beta`)
-   - [OK] **Hors limites** : -5 points (`boundary_penalty`, configurable)
+   
+   **a) Bonus de détection** :
+   ```
+   R_detection = detection_bonus × I(measured_conc > threshold)
+   ```
+   - `detection_bonus = 10.0` (configurable)
+   - `I(condition)` : 1 si condition vraie, 0 sinon
+   - **Exemple** : Détection → `+10.0` points
+   
+   **b) Pénalité hors limites** :
+   ```
+   R_boundary = -boundary_penalty × I(x < 0 OR x > width OR y < 0 OR y > height)
+   ```
+   - `boundary_penalty = 5.0` (configurable)
+   - **Exemple** : Sortie des limites → `-5.0` points
+
+**Exemple complet de calcul de récompense :**
+
+**Scénario** :
+- Position : `(50, 50)`
+- Incertitude GP : `σ = 0.3`
+- Vitesse drone : `(3, 2) m/s`
+- Vitesse vent : `(1, 0) m/s`
+- Vitesse verticale : `0.2 m/s`
+- Détection : `Oui` (concentration > seuil)
+- Dans les limites : `Oui`
+
+**Calcul** :
+1. Gain d'information : `ΔI = 1/(1+0.3) = 0.769` → `+10.0 × 0.769 = +7.69` points
+2. Vitesse relative : `v_air = ||(2, 2)|| = 2.83 m/s`
+3. Puissance : `P = 100 + 2.0 × (2.83)³ + 25.0 × 0.2 = 100 + 45.3 + 5.0 = 150.3 W`
+4. Énergie : `E = 150.3 × 0.1 = 15.03 J` → `-0.1 × 15.03 = -1.50` points
+5. Bonus détection : `+10.0` points
+6. Pénalité limites : `0` points
+
+**Récompense totale** : `R = 7.69 - 1.50 + 10.0 + 0 = +16.19` points
 
 **Normalisation des récompenses :**
 - Récompenses non normalisées (échelle libre)
 - Scaling factor : 1.0 (ajustable via `reward_scale` dans StudentConfig)
+- Les récompenses peuvent varier typiquement entre `-50` et `+50` points par étape
 
 ### 3. Détecteur Amélioré Multi-Critères avec Validateur GP
 
@@ -520,51 +749,199 @@ Le système inclut un **détecteur robuste** (`enhanced_detector.py`) qui valide
 **Estimation robuste de position (PRIORITÉ AU VALIDATEUR GP) :**
 
 **PRIORITÉ 1 : Validateur GP (`MethaneLeakValidator`)** :
-- **Accumulation des mesures** : Toutes les mesures de concentration sont accumulées au fil du temps
-- **Modélisation GP séparée** : GP indépendant du Teacher GP, spécialisé pour l'estimation de position
-- **Score combiné** : `score = 0.7 × concentration_normalisée + 0.3 × confiance`
-  
-  **Calcul détaillé** :
-  ```
-  # 1. Normalisation de la concentration prédite
-  mu_min = mu.min()
-  mu_max = mu.max()
-  mu_normalized = (mu - mu_min) / (mu_max - mu_min + 1e-6)  # [0, 1]
-  
-  # 2. Normalisation de l'incertitude (inversée pour confiance)
-  sigma_max = sigma.max()
-  confidence = 1.0 - (sigma / (sigma_max + 1e-6))  # [0, 1], faible σ = haute confiance
-  confidence = clip(confidence, 0.0, 1.0)
-  
-  # 3. Score combiné
-  combined_score = 0.7 × mu_normalized + 0.3 × confidence  # [0, 1]
-  
-  # 4. Pénalité d'incertitude relative
-  relative_uncertainty = sigma / (|mu| + 1e-6)
-  uncertainty_penalty = where(relative_uncertainty > 0.5, 0.5, 1.0)
-  combined_score = combined_score × uncertainty_penalty
-  
-  # 5. Clip final pour probabilité valide
-  probability = clip(combined_score, 0.0, 1.0)
-  ```
-  
-  **Exemple numérique** :
-  - Point A : `mu = 0.5`, `sigma = 0.1` → `mu_norm = 0.5`, `confidence = 0.9`
-    - `score = 0.7 × 0.5 + 0.3 × 0.9 = 0.35 + 0.27 = 0.62`
-    - `relative_unc = 0.1/0.5 = 0.2 < 0.5` → pas de pénalité
-    - **Probabilité finale = 0.62**
-  
-  - Point B : `mu = 0.3`, `sigma = 0.2` → `mu_norm = 0.3`, `confidence = 0.8`
-    - `score = 0.7 × 0.3 + 0.3 × 0.8 = 0.21 + 0.24 = 0.45`
-    - `relative_unc = 0.2/0.3 = 0.67 > 0.5` → pénalité × 0.5
-    - **Probabilité finale = 0.45 × 0.5 = 0.225**
-- **Seuil adaptatif** :
-  - **< 10 mesures** : Seuil réduit (threshold - 0.15, minimum 0.6) pour détection précoce
-  - **≥ 10 mesures** : Seuil normal (par défaut 0.95)
-- **Résolution de grille adaptative** :
-  - < 10 mesures : 150×150 (très fine pour précision)
-  - ≥ 10 mesures : 100×100 (standard)
-- **Probabilité finale** : Score combiné clipé dans [0, 1] = probabilité GP
+
+Le validateur GP utilise un **Processus Gaussien séparé** du Teacher GP, spécialisé pour l'estimation de position de fuite. Il accumule toutes les mesures de concentration validées et construit une carte de probabilité.
+
+**Architecture du Validateur GP :**
+
+```
+┌─────────────────────────────────────────┐
+│     ACCUMULATION DES MESURES            │
+│  - Positions (x, y)                     │
+│  - Concentrations mesurées               │
+└─────────────────────────────────────────┘
+              ↓
+┌─────────────────────────────────────────┐
+│     MODÉLISATION GP                      │
+│  - Kernel : C(variance) × RBF(ls) + W   │
+│  - length_scale = 5.0 m (plus fin)      │
+│  - Réentraînement à chaque mesure        │
+└─────────────────────────────────────────┘
+              ↓
+┌─────────────────────────────────────────┐
+│     PRÉDICTION SUR GRILLE                │
+│  - μ(x,y) : Concentration prédite        │
+│  - σ(x,y) : Incertitude                  │
+│  - Résolution adaptative                 │
+└─────────────────────────────────────────┘
+              ↓
+┌─────────────────────────────────────────┐
+│     CALCUL DU SCORE COMBINÉ              │
+│  - Normalisation concentration           │
+│  - Conversion incertitude → confiance   │
+│  - Combinaison pondérée                  │
+│  - Pénalité incertitude relative        │
+└─────────────────────────────────────────┘
+              ↓
+┌─────────────────────────────────────────┐
+│     EXTRACTION POSITION                  │
+│  - Seuil adaptatif                       │
+│  - Position avec probabilité max         │
+└─────────────────────────────────────────┘
+```
+
+**Kernel GP du Validateur :**
+
+```
+kernel = C(variance) × RBF(length_scale) + WhiteKernel(noise_level)
+```
+
+où :
+- `C(variance)` : ConstantKernel avec `variance = 1.0`
+- `RBF(length_scale)` : RBF avec `length_scale = 5.0 m` (plus fin que Teacher pour précision)
+- `WhiteKernel(noise_level)` : Bruit avec `noise_level = 0.01² = 0.0001`
+
+**Calcul détaillé du score combiné** :
+
+**Étape 1 : Prédiction GP sur grille**
+```
+# Grille de recherche
+x_min, x_max, y_min, y_max = world_bounds
+nx, ny = grid_size  # Adaptatif : 150×150 si < 10 mesures, 100×100 sinon
+xx = linspace(x_min, x_max, nx)
+yy = linspace(y_min, y_max, ny)
+XX, YY = meshgrid(xx, yy)
+grid_points = [[x, y] for x in xx for y in yy]
+
+# Prédiction GP
+mu, sigma = gp.predict(grid_points, return_std=True)
+# mu : concentration prédite (n_points,)
+# sigma : incertitude (n_points,)
+```
+
+**Étape 2 : Normalisation de la concentration**
+```
+mu_min = min(mu)
+mu_max = max(mu)
+mu_range = mu_max - mu_min
+
+if mu_range > 1e-6:
+    mu_normalized = (mu - mu_min) / (mu_range + 1e-6)  # [0, 1]
+else:
+    mu_normalized = zeros_like(mu)  # Pas de variation
+```
+
+**Étape 3 : Conversion incertitude → confiance**
+```
+sigma_max = max(sigma)
+
+if sigma_max > 1e-6:
+    # Inversion : faible incertitude = haute confiance
+    confidence = 1.0 - (sigma / (sigma_max + 1e-6))  # [0, 1]
+    confidence = clip(confidence, 0.0, 1.0)
+else:
+    confidence = ones_like(sigma)  # Toutes les zones sont certaines
+```
+
+**Étape 4 : Score combiné (pondération)**
+```
+combined_score = 0.7 × mu_normalized + 0.3 × confidence
+```
+
+**Justification des poids** :
+- **70% concentration** : Privilégie les zones avec forte concentration (exploitation)
+- **30% confiance** : Privilégie les zones avec faible incertitude (fiabilité)
+
+**Étape 5 : Pénalité d'incertitude relative**
+```
+relative_uncertainty = sigma / (|mu| + 1e-6)
+uncertainty_penalty = where(relative_uncertainty > 0.5, 0.5, 1.0)
+combined_score = combined_score × uncertainty_penalty
+```
+
+**Interprétation** :
+- Si `σ/|μ| > 0.5` : Incertitude trop élevée par rapport à la concentration → pénalité × 0.5
+- Sinon : Pas de pénalité
+
+**Étape 6 : Probabilité finale**
+```
+probability = clip(combined_score, 0.0, 1.0)
+```
+
+**Exemple numérique complet** :
+
+**Point A** :
+- `mu = 0.5 kg/m³`, `sigma = 0.1`
+- Normalisation : `mu_min = 0.0`, `mu_max = 1.0` → `mu_norm = 0.5`
+- Confiance : `sigma_max = 0.3` → `confidence = 1.0 - 0.1/0.3 = 0.667`
+- Score combiné : `0.7 × 0.5 + 0.3 × 0.667 = 0.35 + 0.2 = 0.55`
+- Incertitude relative : `0.1/0.5 = 0.2 < 0.5` → pas de pénalité
+- **Probabilité finale = 0.55**
+
+**Point B** :
+- `mu = 0.3 kg/m³`, `sigma = 0.2`
+- Normalisation : `mu_norm = 0.3`
+- Confiance : `confidence = 1.0 - 0.2/0.3 = 0.333`
+- Score combiné : `0.7 × 0.3 + 0.3 × 0.333 = 0.21 + 0.1 = 0.31`
+- Incertitude relative : `0.2/0.3 = 0.667 > 0.5` → pénalité × 0.5
+- **Probabilité finale = 0.31 × 0.5 = 0.155**
+
+**Point C (meilleur candidat)** :
+- `mu = 0.8 kg/m³`, `sigma = 0.05`
+- Normalisation : `mu_norm = 0.8`
+- Confiance : `sigma_max = 0.3` → `confidence = 1.0 - 0.05/0.3 = 0.833`
+- Score combiné : `0.7 × 0.8 + 0.3 × 0.833 = 0.56 + 0.25 = 0.81`
+- Incertitude relative : `0.05/0.8 = 0.0625 < 0.5` → pas de pénalité
+- **Probabilité finale = 0.81** → **Candidat sélectionné**
+
+**Seuil adaptatif** :
+```
+if n_measurements < 10:
+    adaptive_threshold = max(0.6, threshold_prob - 0.15)
+    # Seuil réduit pour détection précoce
+else:
+    adaptive_threshold = threshold_prob  # Seuil normal (0.95 par défaut)
+```
+
+**Résolution de grille adaptative** :
+```
+if n_measurements < 10:
+    grid_resolution = 150  # Très fine (22,500 points)
+else:
+    grid_resolution = 100  # Standard (10,000 points)
+```
+
+**Extraction de la position** :
+```
+candidates = where(combined_score >= adaptive_threshold)
+if len(candidates) > 0:
+    best_candidate = argmax(combined_score[candidates])
+    leak_position = grid_points[best_candidate]
+    leak_probability = combined_score[best_candidate]
+else:
+    # Fallback : prendre le maximum même si < seuil
+    best_candidate = argmax(combined_score)
+    if combined_score[best_candidate] >= min_prob (0.4 si < 10 mesures, 0.5 sinon):
+        leak_position = grid_points[best_candidate]
+        leak_probability = combined_score[best_candidate]
+    else:
+        leak_position = None
+```
+
+**Probabilité finale** : Score combiné clipé dans [0, 1] = probabilité GP
+
+**Détection multi-fuites** :
+
+La méthode `get_all_leak_positions()` extrait toutes les positions avec probabilité ≥ seuil :
+
+```
+1. Calculer combined_score sur toute la grille
+2. Identifier candidats : where(combined_score >= min_probability)
+3. Trier par probabilité décroissante
+4. Clustering : regrouper positions proches (< min_distance)
+5. Pour chaque groupe : garder position avec probabilité max
+6. Limiter à 5 positions maximum
+```
 
 **PRIORITÉ 2 : Méthode statistique robuste (fallback si GP non disponible)** :
 
@@ -602,11 +979,168 @@ Si 1-2 détections :
 - `highlight_plus/analysis/enhanced_detector.py` - Détecteur amélioré
 - `highlight_plus/analysis/methane_leak_validator.py` - Validateur GP
 
-### 4. Environnement de Simulation
+### 4. Modèle de Panache de Méthane
+
+Le système utilise un **modèle Gaussien 2D d'advection-diffusion** pour simuler la propagation du méthane dans l'atmosphère.
+
+**Équation de base :**
+
+La concentration de méthane `C(x, y, t)` en un point `(x, y)` à l'instant `t` est donnée par :
+
+```
+C(x, y, t) = (Q × exp(-λt)) / (2π × σ_x × σ_y × u) × exp(-(dx²/(2σ_x²) + dy²/(2σ_y²)))
+```
+
+**Détails des paramètres :**
+
+1. **Débit de la fuite** : `Q` (kg/s)
+   - Intensité de la source de fuite
+   - Valeur typique : 0.1 - 1.0 kg/s
+
+2. **Facteur de décroissance temporelle** : `exp(-λt)`
+   - `λ` : Taux de décroissance (s⁻¹), typiquement 0.01 s⁻¹
+   - Modélise la dilution naturelle dans le temps
+
+3. **Position effective de la source** (advection par le vent) :
+   ```
+   x_eff = x₀ + v_x × t
+   y_eff = y₀ + v_y × t
+   ```
+   où `(x₀, y₀)` est la position initiale de la source et `(v_x, v_y)` est le vecteur vent
+
+4. **Distances relatives** :
+   ```
+   dx = x - x_eff
+   dy = y - y_eff
+   ```
+
+5. **Écarts-types de diffusion** :
+   - `σ_x` : Écart-type selon l'axe X (typiquement 5-10 m)
+   - `σ_y` : Écart-type selon l'axe Y (typiquement 3-5 m)
+   - Plus grands = panache plus étalé
+
+6. **Vitesse du vent** : `u = √(v_x² + v_y²)`
+   - Vitesse du vent en m/s
+   - Typiquement 1-5 m/s
+
+**Exemple numérique :**
+- Source : `(50, 50)`, `Q = 0.5 kg/s`
+- Vent : `(2, 1) m/s` → `u = √5 ≈ 2.24 m/s`
+- Diffusion : `σ_x = 8 m`, `σ_y = 5 m`
+- Point de mesure : `(55, 52)` à `t = 10 s`
+- Position effective : `x_eff = 50 + 2×10 = 70`, `y_eff = 50 + 1×10 = 60`
+- Distances : `dx = 55 - 70 = -15 m`, `dy = 52 - 60 = -8 m`
+- Décroissance : `exp(-0.01×10) = 0.905`
+- Normalisation : `0.5 × 0.905 / (2π × 8 × 5 × 2.24) = 0.00161`
+- Exposant : `-(15²/(2×8²) + 8²/(2×5²)) = -(225/128 + 64/50) = -(1.76 + 1.28) = -3.04`
+- **Concentration** : `0.00161 × exp(-3.04) = 0.00075 kg/m³`
+
+**Calcul du gradient** :
+
+Le gradient de concentration `∇C = (∂C/∂x, ∂C/∂y)` est calculé comme suit :
+
+```
+∂C/∂x = -C × dx / σ_x²
+∂C/∂y = -C × dy / σ_y²
+```
+
+**Amélioration pour navigation** :
+Si la concentration est très faible (`C < 1e-6`), le système utilise un gradient directionnel vers la source pour guider la navigation :
+
+```
+grad_x = -dx / ||(dx, dy)|| × 0.01
+grad_y = -dy / ||(dx, dy)|| × 0.01
+```
+
+Cela évite que le gradient soit ≈0 et bloque la navigation quand le drone est loin de la source.
+
+**Vecteur vent** :
+```
+v_x = wind_speed × cos(wind_direction)
+v_y = wind_speed × sin(wind_direction)
+```
+où `wind_direction` est en degrés, converti en radians.
+
+**Code clé :** `highlight_plus/simulation/plume_model.py`
+
+### 5. Capteur TDLAS (Tunable Diode Laser Absorption Spectroscopy)
+
+Le capteur TDLAS simule la détection de méthane selon le principe de l'absorption différentielle.
+
+**Loi de Beer-Lambert avec dépendance en altitude :**
+
+L'intensité détectée `I_detected` est donnée par :
+
+```
+I_detected = I₀ × exp(-α × C × L) × (ρ / h²) + noise
+```
+
+**Détails des paramètres :**
+
+1. **Intensité laser initiale** : `I₀` (normalisée à 1.0)
+
+2. **Coefficient d'absorption** : `α = 0.1 m²/kg`
+   - Spécifique au méthane CH₄ à la longueur d'onde 1653.7 nm
+
+3. **Concentration** : `C` (kg/m³)
+   - Concentration réelle de méthane
+
+4. **Longueur du trajet optique** : `L = 2 × h`
+   - `h` : Altitude du drone (distance au sol)
+   - Facteur 2 pour aller-retour (émission + réflexion)
+
+5. **Facteur géométrique** : `ρ / h²`
+   - `ρ` : Réflectivité de la surface (typiquement 0.3)
+   - **Dépendance explicite en altitude** : `I_s ∝ ρ / h²`
+   - Plus l'altitude est élevée, plus le signal est faible (loi en 1/h²)
+
+6. **Bruit total** :
+   ```
+   noise = noise_electronic + noise_atmospheric + noise_interference
+   ```
+   où :
+   - `noise_electronic = N(0, σ_electronic)` avec `σ_electronic = 0.02`
+   - `noise_atmospheric = N(0, σ_atm × √(h/10))` avec `σ_atm = 0.05`
+   - `noise_interference = N(0, σ_interf × σ_noise)` avec `σ_interf = 0.1`
+
+**Conversion en concentration mesurée :**
+
+```
+measured_conc = -ln(I_detected / (ρ/h²)) / (α × L) + noise
+```
+
+**Rapport Signal/Bruit (SNR) :**
+
+```
+SNR = signal / noise_std
+```
+
+où :
+- `signal = C × α × L × (ρ / h²)`
+- `noise_std = √(σ_electronic² + (σ_atm × √(h/10))² + (σ_interf × σ_noise)² + (0.01 × h/10)²)`
+
+**Exemple numérique :**
+- Concentration réelle : `C = 0.1 kg/m³`
+- Altitude : `h = 10 m`
+- Réflectivité : `ρ = 0.3`
+- Trajet optique : `L = 2 × 10 = 20 m`
+- Absorption : `α × C × L = 0.1 × 0.1 × 20 = 0.2`
+- Intensité théorique : `I = exp(-0.2) × (0.3/100) = 0.819 × 0.003 = 0.00246`
+- Bruit : `σ_noise ≈ 0.05`
+- **Concentration mesurée** : `≈ 0.1 ± 0.05 kg/m³`
+- **SNR** : `≈ 2.0` (signal faible mais détectable)
+
+**Seuil de détection :**
+- Seuil par défaut : `0.05 kg/m³`
+- Détection : `measured_conc > threshold`
+
+**Code clé :** `highlight_plus/sensors/tdlas_sensor.py`
+
+### 6. Environnement de Simulation
 
 **Architecture Gymnasium standard :**
 
-- **Observation Space** : Box(16,) - État normalisé
+- **Observation Space** : Box(16,) - État normalisé [-1, 1]
 - **Action Space** : Box(3,) - Déplacement normalisé [-1, 1]
 - **Reward Range** : [-100, 200] (théorique)
 
@@ -616,14 +1150,53 @@ Si 1-2 détections :
 - Limites spatiales : 100×100 m
 - Pas de temps : 0.1 s
 
-**Fonction step() :**
-1. Conversion action → déplacement (× vitesse_max)
-2. Mise à jour position
-3. Application contraintes
-4. Calcul concentration (modèle de panache)
-5. Mesure capteur (avec bruit)
-6. Calcul récompense
-7. Vérification terminaison
+**Construction de l'observation (16 dimensions) :**
+
+L'observation complète `s` est construite comme suit :
+
+```
+s = [
+    x / world_width,              # Position X normalisée [0, 1]
+    y / world_height,             # Position Y normalisée [0, 1]
+    z / max_altitude,             # Altitude normalisée [0, 1]
+    vx / max_speed,               # Vitesse X normalisée [-1, 1]
+    vy / max_speed,               # Vitesse Y normalisée [-1, 1]
+    vz / max_speed,               # Vitesse Z normalisée [-1, 1]
+    concentration,                # Concentration mesurée [0, 1]
+    detected,                     # Flag de détection [0, 1]
+    grad_x,                       # Gradient X normalisé [-1, 1]
+    grad_y,                       # Gradient Y normalisé [-1, 1]
+    wind_x / 10.0,                # Vent X normalisé [-1, 1]
+    wind_y / 10.0,                # Vent Y normalisé [-1, 1]
+    SNR / 100.0,                  # SNR normalisé [0, 1]
+    gp_prediction_norm,           # Prédiction GP normalisée [0, 1]
+    gp_uncertainty_norm,           # Incertitude GP normalisée [0, 1]
+    step_count / max_steps        # Temps normalisé [0, 1]
+]
+```
+
+**Conversion action → déplacement :**
+
+```
+displacement = action × max_speed × time_step
+```
+
+**Exemple :**
+- Action : `[0.8, -0.3, 0.0]`
+- `max_speed = 5.0 m/s`, `time_step = 0.1 s`
+- **Déplacement** : `[0.8, -0.3, 0.0] × 5.0 × 0.1 = [0.4, -0.15, 0.0] m`
+
+**Fonction step() détaillée :**
+1. Conversion action → déplacement (× vitesse_max × time_step)
+2. Mise à jour position : `position_new = position_old + displacement`
+3. Application contraintes (clipping spatial et altitude)
+4. Calcul vitesse : `velocity = (position_new - position_old) / time_step`
+5. Calcul concentration réelle (modèle de panache)
+6. Mesure capteur (avec bruit TDLAS)
+7. Calcul gradient (pour navigation)
+8. Calcul SNR (pour observation)
+9. Calcul récompense éco-informative
+10. Vérification terminaison (concentration élevée ou max_steps)
 
 **Code clé :** `highlight_plus/simulation/environment.py`
 
@@ -728,34 +1301,148 @@ D'après les fichiers de validation, tests expérimentaux et rapports de perform
 
 #### **5. Score Global de Performance**
 
-Le système calcule un **score global (0-100)** basé sur :
+Le système calcule un **score global (0-100)** basé sur une moyenne pondérée de trois composantes :
 
 ```
 Score_Global = 0.4 × Score_Détection + 0.4 × Score_Localisation + 0.2 × Score_Efficacité
 ```
 
+**Justification des poids** :
+- **40% Détection** : Capacité à détecter rapidement et fréquemment
+- **40% Localisation** : Précision de l'estimation de position
+- **20% Efficacité** : Consommation énergétique (moins critique mais importante)
+
 **Détails des sous-scores :**
 
 1. **Score de Détection (0-100)** :
+
+   Combine rapidité et taux de détection :
+   
    ```
    Score_Détection = 0.5 × Score_Rapidité + 0.5 × Score_Taux
+   ```
    
+   **a) Score de Rapidité** :
+   ```
    Score_Rapidité = max(0, 100 × (1 - temps_détection / 60))
+   ```
+   
+   - `temps_détection` : Temps de première détection (secondes)
+   - Si détection < 10 s : Score proche de 100
+   - Si détection = 30 s : Score = 50
+   - Si détection ≥ 60 s : Score = 0
+   
+   **Exemple** :
+   - Détection à `t = 2.5 s` → `Score_Rapidité = 100 × (1 - 2.5/60) = 95.8`
+   - Détection à `t = 15 s` → `Score_Rapidité = 100 × (1 - 15/60) = 75.0`
+   - Détection à `t = 45 s` → `Score_Rapidité = 100 × (1 - 45/60) = 25.0`
+   
+   **b) Score de Taux** :
+   ```
    Score_Taux = min(100, taux_détection × 1000)
    ```
+   
+   - `taux_détection = n_detections / n_steps` : Nombre de détections par étape
+   - Si taux = 0.1 (1 détection toutes les 10 étapes) : Score = 100
+   - Si taux = 0.05 : Score = 50
+   - Si taux = 0.01 : Score = 10
+   
+   **Exemple** :
+   - 50 détections sur 500 étapes → `taux = 0.1` → `Score_Taux = 100`
+   - 25 détections sur 500 étapes → `taux = 0.05` → `Score_Taux = 50`
+   - 5 détections sur 500 étapes → `taux = 0.01` → `Score_Taux = 10`
+   
+   **Score de Détection combiné** :
+   - Exemple : `Score_Rapidité = 75`, `Score_Taux = 80`
+   - `Score_Détection = 0.5 × 75 + 0.5 × 80 = 77.5`
 
 2. **Score de Localisation (0-100)** :
+
+   Mesure la précision de l'estimation de position :
+   
    ```
    Si erreur ≤ tolérance:
-       Score = 100 × (1 - erreur / tolérance)
+       Score_Localisation = 100 × (1 - erreur / tolérance)
    Sinon:
-       Score = 50 × exp(-(erreur - tolérance) / 10)
+       Score_Localisation = 50 × exp(-(erreur - tolérance) / 10)
    ```
+   
+   où :
+   - `erreur = ||position_détectée - position_réelle||` (mètres)
+   - `tolérance = 10.0 m` (configurable, typiquement 5-20 m)
+   
+   **Interprétation** :
+   - **Erreur = 0 m** : Score = 100 (parfait)
+   - **Erreur = 5 m** (tolérance = 10 m) : Score = 50
+   - **Erreur = 10 m** (tolérance = 10 m) : Score = 0 (limite de tolérance)
+   - **Erreur = 15 m** (tolérance = 10 m) : Score = 50 × exp(-5/10) = 30.3
+   - **Erreur = 20 m** (tolérance = 10 m) : Score = 50 × exp(-10/10) = 18.4
+   
+   **Exemple numérique** :
+   - Position réelle : `(50.0, 50.0)`
+   - Position détectée : `(52.0, 51.0)`
+   - Erreur : `||(2.0, 1.0)|| = √(4+1) = 2.24 m`
+   - Tolérance : `10.0 m`
+   - `Score_Localisation = 100 × (1 - 2.24/10) = 100 × 0.776 = 77.6`
+   
+   **Cas avec erreur > tolérance** :
+   - Erreur : `15.0 m`, Tolérance : `10.0 m`
+   - `Score_Localisation = 50 × exp(-(15-10)/10) = 50 × exp(-0.5) = 30.3`
 
 3. **Score d'Efficacité (0-100)** :
+
+   Mesure l'efficacité énergétique :
+   
    ```
-   Score = min(100, 100 × (100 / énergie_par_détection))
+   Score_Efficacité = min(100, 100 × (100 / énergie_par_détection))
    ```
+   
+   où :
+   - `énergie_par_détection = énergie_totale / n_detections` (Joules par détection)
+   - Objectif idéal : < 100 J/détection
+   
+   **Interprétation** :
+   - **Énergie = 50 J/détection** : Score = min(100, 100 × (100/50)) = 100
+   - **Énergie = 100 J/détection** : Score = min(100, 100 × (100/100)) = 100
+   - **Énergie = 200 J/détection** : Score = min(100, 100 × (100/200)) = 50
+   - **Énergie = 500 J/détection** : Score = min(100, 100 × (100/500)) = 20
+   
+   **Exemple numérique** :
+   - Énergie totale : `1500 J`
+   - Nombre de détections : `15`
+   - Énergie par détection : `1500/15 = 100 J`
+   - `Score_Efficacité = min(100, 100 × (100/100)) = 100`
+
+**Exemple complet de calcul de score global** :
+
+**Scénario** :
+- Temps de première détection : `5.0 s`
+- Taux de détection : `0.08` (8 détections pour 100 étapes)
+- Erreur de localisation : `3.5 m` (tolérance = 10 m)
+- Énergie par détection : `120 J`
+
+**Calcul** :
+1. **Score de Détection** :
+   - `Score_Rapidité = 100 × (1 - 5/60) = 91.7`
+   - `Score_Taux = min(100, 0.08 × 1000) = 80.0`
+   - `Score_Détection = 0.5 × 91.7 + 0.5 × 80.0 = 85.85`
+
+2. **Score de Localisation** :
+   - `Score_Localisation = 100 × (1 - 3.5/10) = 65.0`
+
+3. **Score d'Efficacité** :
+   - `Score_Efficacité = min(100, 100 × (100/120)) = 83.3`
+
+4. **Score Global** :
+   - `Score_Global = 0.4 × 85.85 + 0.4 × 65.0 + 0.2 × 83.3`
+   - `= 34.34 + 26.0 + 16.66`
+   - `= 77.0 / 100`
+
+**Interprétation du score global** :
+- **80-100** : Excellent - Mission très réussie
+- **60-79** : Bon - Mission réussie avec améliorations possibles
+- **40-59** : Acceptable - Mission partielle
+- **0-39** : Insuffisant - Mission échouée
 
 **Scores typiques observés :**
 - [OK] **80-100** : Excellent - Mission très réussie (15% des cas)
@@ -1256,6 +1943,191 @@ highlight_plus/
 ```
 
 ---
- 
+
+## 📐 Récapitulatif des Formules Mathématiques Principales
+
+Cette section regroupe toutes les formules mathématiques importantes du système HIGHLIGHT+.
+
+### **1. Modèle de Panache de Méthane**
+
+**Concentration** :
+```
+C(x, y, t) = (Q × exp(-λt)) / (2π × σ_x × σ_y × u) × exp(-(dx²/(2σ_x²) + dy²/(2σ_y²)))
+```
+
+**Gradient** :
+```
+∂C/∂x = -C × dx / σ_x²
+∂C/∂y = -C × dy / σ_y²
+```
+
+**Position effective (advection)** :
+```
+x_eff = x₀ + v_x × t
+y_eff = y₀ + v_y × t
+```
+
+### **2. Capteur TDLAS**
+
+**Intensité détectée** :
+```
+I_detected = I₀ × exp(-α × C × L) × (ρ / h²) + noise
+```
+
+**Concentration mesurée** :
+```
+measured_conc = -ln(I_detected / (ρ/h²)) / (α × L) + noise
+```
+
+**SNR** :
+```
+SNR = (C × α × L × (ρ / h²)) / noise_std
+```
+
+### **3. Processus Gaussien (Teacher)**
+
+**Kernel composite** :
+```
+k(x, x') = C(variance) × RBF(length_scale) + WhiteKernel(noise_level)
+```
+
+**RBF** :
+```
+k_RBF(x, x') = exp(-||x - x'||² / (2 × length_scale²))
+```
+
+**Fonction d'acquisition UCB** :
+```
+UCB = exploitation_weight × μ_norm + exploration_weight × β × σ_norm
+```
+
+**Poids adaptatifs** :
+```
+exploration_weight = max(0.3, 1.0 - n_obs / 50.0)
+exploitation_weight = 1.0 - exploration_weight
+```
+
+### **4. Fonction de Récompense**
+
+**Récompense totale** :
+```
+R(s,a) = α × (1 / (1 + σ_GP)) - β × E + R_detection × I(detected) - R_boundary × I(out)
+```
+
+**Puissance** :
+```
+P = P_base + c₁ × v_air³ + c₂ × |dh/dt|
+```
+
+**Énergie** :
+```
+E = P × Δt
+```
+
+### **5. Apprentissage Student (RL)**
+
+**Perte RL** :
+```
+L_RL = MSE(π_θ(s), r + γ × π_θ_target(s') × (1 - done))
+```
+
+**Perte de distillation** :
+```
+L_KL = MSE(π_θ(s), π_teacher(s))
+```
+
+**Perte totale** :
+```
+L_total = L_RL + λ × L_KL
+```
+
+**Exploration ε-greedy** :
+```
+ε(t) = max(ε_end, ε_start - (ε_start - ε_end) × t / ε_decay)
+```
+
+### **6. Validateur GP**
+
+**Score combiné** :
+```
+combined_score = 0.7 × mu_normalized + 0.3 × confidence
+```
+
+**Normalisation** :
+```
+mu_normalized = (mu - mu_min) / (mu_max - mu_min + 1e-6)
+confidence = 1.0 - (sigma / (sigma_max + 1e-6))
+```
+
+**Pénalité incertitude relative** :
+```
+uncertainty_penalty = where(σ/|μ| > 0.5, 0.5, 1.0)
+```
+
+### **7. Métriques de Performance**
+
+**Score global** :
+```
+Score_Global = 0.4 × Score_Détection + 0.4 × Score_Localisation + 0.2 × Score_Efficacité
+```
+
+**Score de détection** :
+```
+Score_Détection = 0.5 × Score_Rapidité + 0.5 × Score_Taux
+Score_Rapidité = max(0, 100 × (1 - temps_détection / 60))
+Score_Taux = min(100, taux_détection × 1000)
+```
+
+**Score de localisation** :
+```
+Si erreur ≤ tolérance:
+    Score = 100 × (1 - erreur / tolérance)
+Sinon:
+    Score = 50 × exp(-(erreur - tolérance) / 10)
+```
+
+**Score d'efficacité** :
+```
+Score = min(100, 100 × (100 / énergie_par_détection))
+```
+
+### **8. Paramètres Clés du Système**
+
+| Paramètre | Valeur | Description |
+|-----------|--------|-------------|
+| **Teacher GP** |
+| `length_scale` | 10.0 m | Distance caractéristique de corrélation |
+| `variance` | 1.0 | Amplitude du kernel |
+| `noise_level` | 1e-3 | Bruit de mesure |
+| `β (UCB)` | 2.0 | Paramètre d'exploration |
+| **Student RL** |
+| `learning_rate` | 3e-4 | Vitesse d'apprentissage |
+| `gamma` | 0.99 | Facteur de discount |
+| `lambda_kl` | 0.1 | Poids de distillation |
+| `epsilon_start` | 1.0 | Exploration initiale |
+| `epsilon_end` | 0.01 | Exploration minimale |
+| **Environnement** |
+| `max_speed` | 5.0 m/s | Vitesse maximale |
+| `time_step` | 0.1 s | Pas de temps |
+| `base_power` | 100 W | Puissance de base |
+| `speed_coefficient` | 50.0 | Coefficient vitesse |
+| `altitude_coefficient` | 25.0 | Coefficient altitude |
+| **Récompense** |
+| `alpha` | 10.0 | Poids gain d'information |
+| `beta` | 0.1 | Poids pénalité énergétique |
+| `detection_bonus` | 10.0 | Bonus détection |
+| `boundary_penalty` | 5.0 | Pénalité hors limites |
+| **Panache** |
+| `sigma_x` | 5-10 m | Écart-type diffusion X |
+| `sigma_y` | 3-5 m | Écart-type diffusion Y |
+| `decay_rate` | 0.01 s⁻¹ | Taux de décroissance |
+| **Capteur TDLAS** |
+| `alpha` | 0.1 m²/kg | Coefficient d'absorption |
+| `detection_threshold` | 0.05 kg/m³ | Seuil de détection |
+| `noise_level` | 0.1 | Niveau de bruit |
+
+---
+
 *Projet : HIGHLIGHT+ - Concours Innovation Natran x UTT*  
-*Version : 1.0 - Analyse Complète*
+*Version : 2.0 - Analyse Complète avec Formules Détaillées*  
+*Dernière mise à jour : 2024*
