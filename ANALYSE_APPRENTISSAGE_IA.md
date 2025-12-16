@@ -1944,7 +1944,7 @@ highlight_plus/
 
 ---
 
-## 📐 Récapitulatif des Formules Mathématiques Principales
+## Récapitulatif des Formules Mathématiques Principales
 
 Cette section regroupe toutes les formules mathématiques importantes du système HIGHLIGHT+.
 
