@@ -38,6 +38,28 @@ Où :
 kernel = ConstantKernel(variance) * RBF(length_scale) + WhiteKernel(noise_level)
 ```
 
+**Détails du Kernel :**
+- **ConstantKernel** : `C(variance)` où `variance = 1.0` (amplitude de la fonction)
+  - Contrôle l'échelle globale des prédictions
+  - Plus grande variance = prédictions plus variables
+  
+- **RBF (Radial Basis Function)** : `RBF(length_scale)` où `length_scale = 10.0 m`
+  - Kernel exponentiel quadratique : `k(x, x') = exp(-||x - x'||² / (2 × length_scale²))`
+  - `length_scale` : Distance caractéristique de corrélation
+  - Points à distance < `length_scale` sont fortement corrélés
+  - Points à distance > `length_scale` sont faiblement corrélés
+  
+- **WhiteKernel** : `WhiteKernel(noise_level)` où `noise_level = 1e-3`
+  - Modélise le bruit de mesure : `k(x, x') = noise_level × δ(x, x')`
+  - `δ(x, x')` : Fonction de Dirac (1 si x = x', 0 sinon)
+  - Permet au GP de gérer l'incertitude de mesure
+
+**Exemple de calcul de covariance :**
+Pour deux points `x₁ = (10, 20)` et `x₂ = (12, 22)` :
+- Distance : `||x₁ - x₂|| = √((12-10)² + (22-20)²) = √8 ≈ 2.83 m`
+- Covariance RBF : `exp(-2.83² / (2 × 10²)) = exp(-0.04) ≈ 0.96` (forte corrélation)
+- Si distance = 20 m : `exp(-20² / (2 × 10²)) = exp(-2) ≈ 0.14` (faible corrélation)
+
 **Algorithme détaillé :**
 
 1. **Initialisation** :
@@ -45,20 +67,127 @@ kernel = ConstantKernel(variance) * RBF(length_scale) + WhiteKernel(noise_level)
    - Longueur d'échelle : 10.0 m (ajustable)
    - Variance : 1.0
    - Niveau de bruit : 1e-3
+   - Kernel composite : `ConstantKernel(variance) × RBF(length_scale) + WhiteKernel(noise_level)`
 
 2. **Pour chaque itération** :
-   - **Entraînement du GP** : Ajustement des hyperparamètres sur toutes les observations collectées
+   - **Entraînement du GP** : Réentraînement complet à chaque nouvelle observation (minimum 2 observations)
    - **Prédiction** : Calcul de `μ(x)` et `σ(x)` pour tous les points de l'espace
-   - **Fonction d'acquisition UCB** : `UCB(x) = μ(x) + β·σ(x)`
-     - `β = 2.0-2.5` : Paramètre d'exploration (équilibre exploration/exploitation)
-   - **Sélection du point optimal** : `x* = argmax(UCB(x))`
+   - **Fonction d'acquisition UCB améliorée** :
+     - **Étape 1 : Normalisation** :
+       ```
+       μ_norm = (μ - μ_min) / (μ_max - μ_min + ε)
+       σ_norm = (σ - σ_min) / (σ_max - σ_min + ε)
+       ```
+       où `ε = 1e-6` pour éviter division par zéro
+     
+     - **Étape 2 : Calcul des poids adaptatifs** :
+       ```
+       n_obs = nombre_d_observations
+       exploration_weight = max(0.3, 1.0 - n_obs / 50.0)
+       exploitation_weight = 1.0 - exploration_weight
+       ```
+       - **Exemple avec 5 observations** : `exploration_weight = max(0.3, 1.0 - 5/50) = 0.9` (90% exploration)
+       - **Exemple avec 30 observations** : `exploration_weight = max(0.3, 1.0 - 30/50) = 0.4` (40% exploration)
+       - **Exemple avec 60 observations** : `exploration_weight = max(0.3, 1.0 - 60/50) = 0.3` (30% exploration, minimum)
+     
+     - **Étape 3 : Calcul UCB** :
+       ```
+       UCB = exploitation_weight × μ_norm + exploration_weight × β × σ_norm
+       ```
+       où `β = 2.0` (paramètre d'exploration, par défaut)
+     
+     - **Exemple numérique** :
+       - Point A : `μ = 0.5`, `σ = 0.3` → `μ_norm = 0.5`, `σ_norm = 0.3`
+       - Point B : `μ = 0.3`, `σ = 0.8` → `μ_norm = 0.3`, `σ_norm = 0.8`
+       - Avec 10 observations : `exploration_weight = 0.8`, `exploitation_weight = 0.2`
+       - Point A : `UCB = 0.2 × 0.5 + 0.8 × 2.0 × 0.3 = 0.1 + 0.48 = 0.58`
+       - Point B : `UCB = 0.2 × 0.3 + 0.8 × 2.0 × 0.8 = 0.06 + 1.28 = 1.34` → **Point B sélectionné** (plus d'incertitude)
+   - **Sélection du point optimal** : `x* = argmax(UCB(x))` avec contraintes de distance
    - **Mesure** : Prise de mesure à la position `x*`
    - **Mise à jour** : Ajout de l'observation `(x*, y*)` au GP
 
-3. **Stratégies adaptatives** :
-   - Si gradient disponible : Suit le gradient avec pas adaptatif (1-5 m)
-   - Si peu d'observations (<10) : Navigation vers cible estimée avec exploration
-   - Si convergence : Utilise la fonction d'acquisition sur grille 50×50
+3. **Stratégies adaptatives multi-niveaux** :
+
+   **Phase de convergence fine** (< 5m de source estimée) :
+   - **Objectif** : Recherche locale précise autour de la source estimée
+   - **Stratégie** : Mouvement en spirale combinant exploration tangentielle et convergence radiale
+   - **Calcul de l'angle de recherche** :
+     ```
+     angle_to_source = arctan2(source_y - current_y, source_x - current_x)
+     search_angle = angle_to_source + (n_obs × 0.5) % (2π)
+     ```
+   - **Direction tangentielle** (perpendiculaire au rayon) :
+     ```
+     tangent_x = -sin(search_angle)
+     tangent_y = cos(search_angle)
+     ```
+   - **Direction radiale** (vers la source) :
+     ```
+     radial_x = cos(angle_to_source)
+     radial_y = sin(angle_to_source)
+     ```
+   - **Combinaison** : `60% tangentiel + 40% radial`
+   - **Taille de pas** : `step_size = max(0.2, distance × 0.1)` clipé entre 0.2m et 0.5m
+   - **Exemple** : Si distance = 3m → `step_size = max(0.2, 0.3) = 0.3m`
+
+   **Convergence guidée** (5-15m de source estimée) :
+   - **Objectif** : Approche guidée vers la source avec précision croissante
+   - **Taille de pas adaptative** :
+     ```
+     adaptive_max_step = max(0.5, distance × 0.15)  # Max 2.25m à 15m, 0.5m à 5m
+     adaptive_min_step = max(0.2, distance × 0.04)  # Max 0.6m à 15m, 0.2m à 5m
+     step_size = adaptive_max_step × (distance / 15.0)
+     step_size = clip(step_size, adaptive_min_step, adaptive_max_step)
+     ```
+   - **Exemple** : Si distance = 10m :
+     - `adaptive_max_step = max(0.5, 1.5) = 1.5m`
+     - `adaptive_min_step = max(0.2, 0.4) = 0.4m`
+     - `step_size = 1.5 × (10/15) = 1.0m` → clipé entre 0.4m et 1.5m = **1.0m**
+   - **Si gradient disponible** : `70% direction source + 30% gradient`
+   - **Sinon** : Direction directe vers source estimée
+
+   **Si gradient significatif disponible** (magnitude > 1e-7) :
+   - **Direction** : Normalisation du gradient vers la source
+   - **Taille de pas** :
+     ```
+     base_step = (min_step_size + max_step_size) / 2 = 3.0m
+     step_size = base_step × (1 + min(gradient_magnitude × 10, 1.0))
+     step_size = clip(step_size, 1.0m, 5.0m)
+     ```
+   - **Exemple** : Si `gradient_magnitude = 0.05` :
+     - `step_size = 3.0 × (1 + min(0.5, 1.0)) = 3.0 × 1.5 = 4.5m` → clipé à **4.5m**
+
+   **Si peu d'observations (< 10) et cible fournie** :
+   - **Direction** : Vers cible avec exploration aléatoire
+     ```
+     direction = (target - current) / ||target - current||
+     direction += random_uniform(-0.3, 0.3)  # Exploration
+     direction = direction / ||direction||  # Renormalisation
+     ```
+   - **Taille de pas** : `min(5.0m, distance × 0.5)`
+   - **Exemple** : Si distance = 30m → `step_size = min(5.0, 15.0) = 5.0m`
+
+   **Sinon (exploration active avec acquisition function)** :
+   - **Résolution de grille adaptative** :
+     ```
+     if n_obs < 20:  grid_resolution = 150  # 22,500 points
+     elif n_obs < 50: grid_resolution = 120  # 14,400 points
+     else:            grid_resolution = 100   # 10,000 points
+     ```
+   - **Fonction d'acquisition combinée** :
+     ```
+     # Calcul de l'incertitude normalisée
+     uncertainty_norm = (uncertainty - uncertainty.min()) / (uncertainty.max() - uncertainty.min())
+     
+     # Combinaison
+     combined_acquisition = 0.6 × acquisition_values + 0.4 × uncertainty_norm
+     ```
+   - **Contrainte de distance** :
+     ```
+     distances = sqrt((X_grid - current_x)² + (Y_grid - current_y)²)
+     valid_mask = (distances >= 1.0m) AND (distances <= 5.0m)
+     ```
+   - **Sélection** : Point avec `max(combined_acquisition[valid_mask])`
 
 **Avantages :**
 - [OK] Exploration intelligente basée sur l'incertitude
@@ -70,9 +199,29 @@ kernel = ConstantKernel(variance) * RBF(length_scale) + WhiteKernel(noise_level)
 **Code clé :** `highlight_plus/models/teacher_gp.py`
 
 **Complexité computationnelle :**
-- Entraînement GP : O(n³) où n = nombre d'observations
-- Prédiction : O(n²) par point
-- Optimisation : O(m·n²) où m = taille de la grille (50×50 = 2500 points)
+
+- **Entraînement GP** : O(n³) où n = nombre d'observations
+  - **Réentraînement** : À chaque nouvelle observation (méthode `_update_gp()`)
+  - **Inversion de matrice** : O(n³) pour calculer `K⁻¹` (matrice de covariance n×n)
+  - **Exemple** : Avec 50 observations → ~125,000 opérations
+  
+- **Prédiction GP** : O(n²) par point
+  - **Calcul de covariance** : O(n) pour chaque point de prédiction
+  - **Multiplication matrice-vecteur** : O(n²)
+  - **Exemple** : Prédire 1 point avec 50 observations → ~2,500 opérations
+  
+- **Optimisation (sélection de point)** : O(m·n²) où m = taille de la grille
+  - **Prédiction sur grille** : m points × O(n²) = O(m·n²)
+  - **Calcul acquisition** : O(m) (opérations élémentaires)
+  - **Recherche du maximum** : O(m)
+  - **Exemples** :
+    - 20 observations, grille 150×150 : O(22,500 × 400) ≈ **9M opérations**
+    - 50 observations, grille 100×100 : O(10,000 × 2,500) ≈ **25M opérations**
+  
+- **Temps d'exécution estimé** (CPU moderne) :
+  - Entraînement GP (50 obs) : ~10-50 ms
+  - Prédiction (1 point, 50 obs) : ~0.1-1 ms
+  - Optimisation complète (50 obs, grille 100×100) : ~100-500 ms
 
 #### **B. Apprenti (Student) - Apprentissage par Renforcement**
 
@@ -95,60 +244,119 @@ Couche 3 : Linear(256 → 128) + Tanh
 Output (Action) : Linear(128 → 3) + Tanh
 ```
 
-**État d'entrée (16 dimensions) :**
-1. Position normalisée (x, y, z) : 3 dims
-2. Vitesse normalisée (vx, vy, vz) : 3 dims
-3. Concentration mesurée : 1 dim
-4. Gradient local (gx, gy) : 2 dims
-5. Prédiction GP : 1 dim
-6. Incertitude GP : 1 dim
-7. SNR (Signal-to-Noise Ratio) : 1 dim
-8. Temps normalisé : 1 dim
-9. Distance à la source (si connue) : 1 dim
-10. Énergie restante normalisée : 1 dim
-11. Historique récent (moyenne mobile) : 1 dim
+**État d'entrée (16 dimensions) - Détails complets :**
+
+1. **Position normalisée (x, y, z)** : 3 dims
+   - `x_norm = x / world_width` (0-1)
+   - `y_norm = y / world_height` (0-1)
+   - `z_norm = (z - min_altitude) / (max_altitude - min_altitude)` (0-1)
+   - **Exemple** : Position (50, 30, 8) dans monde 100×100, altitude 2-20m
+     - `x_norm = 50/100 = 0.5`
+     - `y_norm = 30/100 = 0.3`
+     - `z_norm = (8-2)/(20-2) = 6/18 = 0.33`
+
+2. **Vitesse normalisée (vx, vy, vz)** : 3 dims
+   - `vx_norm = vx / max_speed` (-1 à 1)
+   - `vy_norm = vy / max_speed` (-1 à 1)
+   - `vz_norm = vz / max_speed` (-1 à 1)
+   - **Exemple** : Vitesse (2, -1, 0) m/s avec max_speed=5 m/s
+     - `vx_norm = 2/5 = 0.4`
+     - `vy_norm = -1/5 = -0.2`
+     - `vz_norm = 0/5 = 0.0`
+
+3. **Concentration mesurée** : 1 dim
+   - Normalisée : `conc_norm = min(measured_conc / max_expected_conc, 1.0)`
+   - **Exemple** : Concentration mesurée 0.1 kg/m³ → `conc_norm = 0.1/1.0 = 0.1`
+
+4. **Gradient local (gx, gy)** : 2 dims
+   - Normalisé : `grad_norm = gradient / max_gradient_expected`
+   - Clipé entre -1 et 1
+   - **Exemple** : Gradient (0.05, -0.02) → normalisé à (0.5, -0.2)
+
+5. **Prédiction GP (μ)** : 1 dim
+   - Normalisée : `μ_norm = μ / max_expected_conc`
+   - **Exemple** : Prédiction GP = 0.3 kg/m³ → `μ_norm = 0.3`
+
+6. **Incertitude GP (σ)** : 1 dim
+   - Normalisée : `σ_norm = σ / max_uncertainty`
+   - **Exemple** : Incertitude = 0.1 → `σ_norm = 0.1/1.0 = 0.1`
+
+7. **SNR (Signal-to-Noise Ratio)** : 1 dim
+   - Normalisé : `SNR_norm = min(SNR / max_SNR, 1.0)`
+   - **Exemple** : SNR = 15 dB → `SNR_norm = 15/30 = 0.5`
+
+8. **Temps normalisé** : 1 dim
+   - `time_norm = current_time / max_time` (0-1)
+   - **Exemple** : 30s sur mission de 100s → `time_norm = 0.3`
+
+9. **Distance à la source** : 1 dim (si connue, sinon 0)
+   - Normalisée : `dist_norm = distance / max_distance`
+   - **Exemple** : Distance 25m dans monde 100×100 → `dist_norm = 25/141 ≈ 0.18`
+
+10. **Vecteur vent (wind_x, wind_y)** : 2 dims
+    - Normalisé : `wind_norm = wind_vector / max_wind_speed`
+    - **Exemple** : Vent (2, 1) m/s → normalisé à (0.2, 0.1) si max_wind=10 m/s
+
+**Note** : Les dimensions 9-11 mentionnées dans l'ancienne version sont maintenant intégrées dans les dimensions ci-dessus ou calculées dynamiquement.
 
 **Action de sortie (3 dimensions) :**
 - `[Δx, Δy, Δz]` : Déplacement normalisé [-1, 1]
+- **Conversion en déplacement réel** :
+  ```
+  max_displacement = max_speed × time_step  # Ex: 5.0 m/s × 0.1s = 0.5m
+  displacement = action × max_displacement
+  ```
+- **Exemple** : Action `[0.8, -0.3, 0.0]` avec max_speed=5 m/s, time_step=0.1s
+  - `displacement = [0.8, -0.3, 0.0] × 0.5 = [0.4m, -0.15m, 0.0m]`
+  - Nouvelle position : `old_pos + displacement`
 
 **Algorithme d'Apprentissage détaillé :**
 
 1. **Sélection d'action** :
    - **Mode exploitation** : Réseau prédit l'action optimale `a = π_θ(s)`
-   - **Mode exploration** : Action aléatoire (ε-greedy avec décroissance)
-     - `ε(t) = ε_start * exp(-t / ε_decay)`
-     - Décroissance adaptative : Plus rapide si perte faible
+   - **Mode exploration** : 
+     - **Exploration guidée** : Si `teacher_guidance` disponible et exploration (ε), utilise guidance Teacher avec bruit (±0.3)
+     - **Exploration aléatoire** : Action aléatoire uniforme [-0.5, 0.5] si pas de guidance
+     - **Décroissance adaptative** : 
+       - Si perte moyenne récente < 0.1 : décroissance × 1.5 (plus rapide)
+       - Sinon : décroissance normale
+       - `ε(t) = max(ε_end, ε - decay_rate)`
+   - **Guidance Teacher pour Student peu entraîné** :
+     - Si < 50 itérations d'apprentissage et guidance disponible : `action = 0.7 × action + 0.3 × teacher_guidance`
 
 2. **Stockage d'expérience** :
    - Buffer de rejeu (Replay Buffer) stocke tuples `(s, a, r, s', done)`
-   - Taille : 10,000 expériences
+   - Taille : 10,000 expériences (configurable)
    - Échantillonnage uniforme pour briser la corrélation temporelle
 
 3. **Apprentissage hors-ligne (DQN-like)** :
-   - **Échantillonnage** : Batch de 64 expériences aléatoires
+   - **Condition de démarrage** : Apprentissage commence après `learning_starts` expériences (par défaut 1000)
+   - **Échantillonnage** : Batch de 64 expériences aléatoires (configurable)
    - **Calcul de la perte RL** :
      ```
-     Q_target = r + γ * Q_target(s', a')
-     L_RL = MSE(Q(s,a), Q_target)
+     Q_current = π_θ(s)
+     Q_target = r + γ * π_target(s')
+     L_RL = MSE(Q_current, Q_target)
      ```
    - **Calcul de la perte de distillation** :
      ```
      L_KL = MSE(π_teacher(s), π_student(s))
      ```
-     - Calculée toutes les 10 étapes
-     - Température de distillation : 3.0
+     - Calculée toutes les 10 étapes (`teacher_update_freq`)
+     - Température de distillation : 3.0 (configurable)
    - **Perte totale** :
      ```
      L = L_RL + λ·L_KL
      ```
-     - `λ = 0.1` : Poids de la distillation
+     - `λ = 0.1` : Poids de la distillation (configurable)
    - **Optimisation** :
-     - Optimiseur : Adam (learning_rate = 3e-4)
+     - Optimiseur : Adam (learning_rate = 3e-4, configurable)
      - Gradient clipping : max_norm = 1.0 (stabilité)
      - Rétropropagation standard
+     - Apprentissage à chaque étape après `learning_starts` expériences
 
 4. **Mise à jour du réseau cible** :
-   - Toutes les 100 étapes
+   - Toutes les 100 étapes (`target_update_freq`, configurable)
    - Copie complète des poids : `θ_target = θ`
 
 **Hyperparamètres détaillés :**
@@ -170,46 +378,115 @@ Output (Action) : Linear(128 → 3) + Tanh
 **Code clé :** `highlight_plus/models/student_rl.py`
 
 **Complexité computationnelle :**
-- Forward pass : O(d·h) où d=16, h=256
-- Backward pass : O(d·h) (identique)
-- Apprentissage : O(batch_size · d·h) = O(64 · 16 · 256) ≈ O(262K) opérations
+
+- **Forward pass** : O(Σ(layer_i × layer_{i+1}))
+  - Couche 1 : 16 × 256 = 4,096 opérations
+  - Couche 2 : 256 × 256 = 65,536 opérations
+  - Couche 3 : 256 × 128 = 32,768 opérations
+  - Couche sortie : 128 × 3 = 384 opérations
+  - **Total** : ~102,784 opérations par forward pass
+  
+- **Nombre de paramètres** :
+  - Couche 1 : 16 × 256 + 256 (bias) = 4,352 paramètres
+  - Couche 2 : 256 × 256 + 256 (bias) = 65,792 paramètres
+  - Couche 3 : 256 × 128 + 128 (bias) = 32,896 paramètres
+  - Couche sortie : 128 × 3 + 3 (bias) = 387 paramètres
+  - **Total** : **103,427 paramètres** à entraîner
+  
+- **Backward pass** : O(Σ(layer_i × layer_{i+1})) (identique au forward)
+  - Calcul des gradients : ~102,784 opérations
+  
+- **Apprentissage (batch)** :
+  - Forward : batch_size × forward_cost = 64 × 102,784 ≈ 6.6M opérations
+  - Backward : batch_size × backward_cost = 64 × 102,784 ≈ 6.6M opérations
+  - Mise à jour : O(paramètres) = 103,427 opérations
+  - **Total par batch** : ~**13.3M opérations**
+  
+- **Temps d'exécution estimé** (GPU moderne) :
+  - Forward pass (1 état) : ~0.01-0.1 ms
+  - Apprentissage (batch 64) : ~1-5 ms
 
 ### 2. Fonction de Récompense Éco-Informative
 
 Le système optimise une fonction multi-objectifs qui combine gain d'information et efficacité énergétique :
 
 ```
-R(s,a) = α · ΔI(M_GP) - β · E(s,a) + R_detection + R_proximity
+R(s,a) = α · ΔI(M_GP) - β · E(s,a) + R_detection + R_boundary
 ```
 
 **Composantes détaillées :**
 
-1. **Gain d'information** : `ΔI(M_GP) = H(M_GP_t) - H(M_GP_{t+1})`
-   - Réduction de l'entropie du modèle GP
-   - Mesure l'utilité informationnelle de la mesure
-   - Poids : `α = 5.0`
+1. **Gain d'information** : `ΔI(M_GP) = 1 / (1 + uncertainty)`
+   - **Calcul détaillé** :
+     ```
+     Si Teacher GP disponible et entraîné :
+         X_pred = [[x, y]]  # Position actuelle
+         _, std = teacher.gp.predict(X_pred, return_std=True)
+         uncertainty = std[0]  # Incertitude à la position actuelle
+         information_gain = 1.0 / (1.0 + uncertainty)
+     Sinon (GP non entraîné) :
+         gradient_magnitude = sqrt(grad_x² + grad_y²)
+         information_gain = gradient_magnitude  # Proxy du gain d'information
+     ```
+   - **Exemple numérique** :
+     - Incertitude GP = 0.2 → `ΔI = 1/(1+0.2) = 0.83`
+     - Incertitude GP = 0.5 → `ΔI = 1/(1+0.5) = 0.67`
+     - Incertitude GP = 1.0 → `ΔI = 1/(1+1.0) = 0.5`
+   - **Poids** : `α = 10.0` (configurable via `config.detection_bonus`)
+   - **Contribution à la récompense** : `+10.0 × ΔI` points
 
-2. **Coût énergétique** : `E(s,a) = P_base + P_speed·||v|| + P_alt·h`
-   - Puissance de base : 100 W
-   - Coefficient vitesse : 50 W/(m/s)
-   - Coefficient altitude : 25 W/m
-   - Poids : `β = 0.1`
+2. **Coût énergétique** : `E(s,a) = P_base + c₁·v_air³ + c₂·|dh/dt|`
+   
+   **Calcul détaillé de la puissance** :
+   ```
+   # 1. Vitesse par rapport à l'air
+   v_drone_ground = drone_velocity[:2]  # Vitesse horizontale du drone
+   u_vent = plume._wind_vector  # Vecteur vitesse du vent
+   v_air_vector = v_drone_ground - u_vent
+   v_air = ||v_air_vector||  # Norme de la vitesse relative
+   
+   # 2. Coefficient vitesse
+   c₁ = speed_coefficient / max_speed²
+      = 50.0 / (5.0)²
+      = 50.0 / 25.0
+      = 2.0 W·s²/m³
+   
+   # 3. Taux de changement d'altitude
+   dh_dt = |drone_velocity[2]|  # Vitesse verticale absolue
+   
+   # 4. Puissance totale
+   P = base_power + c₁ × v_air³ + c₂ × dh_dt
+     = 100.0 + 2.0 × v_air³ + 25.0 × dh_dt
+   
+   # 5. Énergie consommée
+   E = P × time_step
+     = P × 0.1  # Joules
+   ```
+   
+   **Exemple numérique** :
+   - Vitesse drone : (3, 2) m/s
+   - Vitesse vent : (1, 0) m/s
+   - Vitesse relative : `v_air = ||(2, 2)|| = √8 ≈ 2.83 m/s`
+   - Vitesse verticale : `dh_dt = 0.5 m/s`
+   - Puissance : `P = 100 + 2.0 × (2.83)³ + 25.0 × 0.5 = 100 + 45.3 + 12.5 = 157.8 W`
+   - Énergie : `E = 157.8 × 0.1 = 15.78 J`
+   
+   - **Poids** : `β = |energy_penalty| = 0.1` (configurable)
+   - **Contribution à la récompense** : `-0.1 × E` points (dans l'exemple : `-1.578` points)
 
 3. **Récompenses spécifiques** :
-   - [OK] **Détection de fuite** : +100 points (une seule fois par détection)
-   - [OK] **Proximité à la source** : +10 × (1/distance) (continu)
-   - [OK] **Réduction d'incertitude** : +5 × ΔI (continu)
-   - [NON] **Consommation d'énergie** : -0.1 × énergie (continu)
-   - [NON] **Hors limites** : -50 points (pénalité)
-   - [NON] **Pas de progression** : -1 point (pénalité légère)
+   - [OK] **Détection de fuite** : +10 points (`detection_bonus`, configurable)
+   - [OK] **Gain d'information** : +10 × ΔI (continu, via `alpha`)
+   - [OK] **Consommation d'énergie** : -0.1 × énergie (continu, via `beta`)
+   - [OK] **Hors limites** : -5 points (`boundary_penalty`, configurable)
 
 **Normalisation des récompenses :**
-- Récompenses normalisées entre [-1, 1] pour stabilité
-- Scaling factor : 1.0 (ajustable)
+- Récompenses non normalisées (échelle libre)
+- Scaling factor : 1.0 (ajustable via `reward_scale` dans StudentConfig)
 
-### 3. Détecteur Amélioré Multi-Critères
+### 3. Détecteur Amélioré Multi-Critères avec Validateur GP
 
-Le système inclut un **détecteur robuste** (`enhanced_detector.py`) qui valide les détections avec plusieurs critères :
+Le système inclut un **détecteur robuste** (`enhanced_detector.py`) qui valide les détections avec plusieurs critères et utilise un **Validateur GP** (`MethaneLeakValidator`) pour l'estimation probabiliste de position :
 
 **Validation des détections (4 critères) :**
 
@@ -222,7 +499,7 @@ Le système inclut un **détecteur robuste** (`enhanced_detector.py`) qui valide
 
 2. **Calcul de confiance** : Score [0,1] basé sur 4 facteurs :
    - **Qualité de la mesure** (30%) : `exp(-(ratio - 1)²)`
-     - Ratio = concentration_mesurée / concentration_réelle
+     - Ratio = concentration_mesurée / concentration_réelle (cap à 2x)
    - **Distance à la source** (30%) : `exp(-distance / 30)`
      - Plus proche = plus confiant
    - **Magnitude du gradient** (20%) : `min(gradient / 0.1, 1.0)`
@@ -231,7 +508,7 @@ Le système inclut un **détecteur robuste** (`enhanced_detector.py`) qui valide
 
 3. **Validation de progression** :
    - Vérifie si concentration augmente sur 5 dernières mesures
-   - Au moins 60% des mesures doivent être croissantes
+   - Au moins 60% des mesures doivent être croissantes (≥ 95% de la précédente)
 
 4. **Validation finale** :
    ```
@@ -240,26 +517,90 @@ Le système inclut un **détecteur robuste** (`enhanced_detector.py`) qui valide
               (distance < 15m AND concentration > 0.8 × seuil)
    ```
 
-**Estimation robuste de position :**
+**Estimation robuste de position (PRIORITÉ AU VALIDATEUR GP) :**
+
+**PRIORITÉ 1 : Validateur GP (`MethaneLeakValidator`)** :
+- **Accumulation des mesures** : Toutes les mesures de concentration sont accumulées au fil du temps
+- **Modélisation GP séparée** : GP indépendant du Teacher GP, spécialisé pour l'estimation de position
+- **Score combiné** : `score = 0.7 × concentration_normalisée + 0.3 × confiance`
+  
+  **Calcul détaillé** :
+  ```
+  # 1. Normalisation de la concentration prédite
+  mu_min = mu.min()
+  mu_max = mu.max()
+  mu_normalized = (mu - mu_min) / (mu_max - mu_min + 1e-6)  # [0, 1]
+  
+  # 2. Normalisation de l'incertitude (inversée pour confiance)
+  sigma_max = sigma.max()
+  confidence = 1.0 - (sigma / (sigma_max + 1e-6))  # [0, 1], faible σ = haute confiance
+  confidence = clip(confidence, 0.0, 1.0)
+  
+  # 3. Score combiné
+  combined_score = 0.7 × mu_normalized + 0.3 × confidence  # [0, 1]
+  
+  # 4. Pénalité d'incertitude relative
+  relative_uncertainty = sigma / (|mu| + 1e-6)
+  uncertainty_penalty = where(relative_uncertainty > 0.5, 0.5, 1.0)
+  combined_score = combined_score × uncertainty_penalty
+  
+  # 5. Clip final pour probabilité valide
+  probability = clip(combined_score, 0.0, 1.0)
+  ```
+  
+  **Exemple numérique** :
+  - Point A : `mu = 0.5`, `sigma = 0.1` → `mu_norm = 0.5`, `confidence = 0.9`
+    - `score = 0.7 × 0.5 + 0.3 × 0.9 = 0.35 + 0.27 = 0.62`
+    - `relative_unc = 0.1/0.5 = 0.2 < 0.5` → pas de pénalité
+    - **Probabilité finale = 0.62**
+  
+  - Point B : `mu = 0.3`, `sigma = 0.2` → `mu_norm = 0.3`, `confidence = 0.8`
+    - `score = 0.7 × 0.3 + 0.3 × 0.8 = 0.21 + 0.24 = 0.45`
+    - `relative_unc = 0.2/0.3 = 0.67 > 0.5` → pénalité × 0.5
+    - **Probabilité finale = 0.45 × 0.5 = 0.225**
+- **Seuil adaptatif** :
+  - **< 10 mesures** : Seuil réduit (threshold - 0.15, minimum 0.6) pour détection précoce
+  - **≥ 10 mesures** : Seuil normal (par défaut 0.95)
+- **Résolution de grille adaptative** :
+  - < 10 mesures : 150×150 (très fine pour précision)
+  - ≥ 10 mesures : 100×100 (standard)
+- **Probabilité finale** : Score combiné clipé dans [0, 1] = probabilité GP
+
+**PRIORITÉ 2 : Méthode statistique robuste (fallback si GP non disponible)** :
 
 Si ≥ 3 détections :
-1. **Filtrage des outliers** :
+1. **Clustering spatial** :
    - Calcul distance médiane inter-détections
-   - Rejet si distance > 2× médiane
-   - Filtrage statistique (Z-score > 3)
+   - Seuil de clustering : 1.2× médiane
+   - Identification du cluster principal (≥ 30% des détections)
 
-2. **Moyenne pondérée** :
-   ```
-   poids = (concentration / max_concentration)² × confidence
-   position_estimée = Σ(poids_i × position_i) / Σ(poids_i)
-   ```
-   - Pondération exponentielle pour fortes concentrations
-   - Normalisation des poids
+2. **Filtrage des outliers** :
+   - Calcul centre médian du cluster
+   - Rejet si distance > 1.5× distance médiane au centre
+
+3. **Poids combinés** (INDÉPENDANT de la position réelle) :
+   - **Poids temporel** : `exp(2.0 × steps_normalized)` (favorise détections récentes)
+   - **Poids de cohérence spatiale** : `1.0 / (1.0 + avg_distance / 5.0)` (favorise détections cohérentes)
+   - **Poids finaux** : `concentration_normalized × confidence × temporal × coherence`
+
+4. **Estimation robuste** :
+   - Médiane pondérée : 70% médiane robuste + 30% moyenne pondérée
+   - Confiance globale = moyenne pondérée des confiances
 
 Si 1-2 détections :
 - Utilise la meilleure détection (plus haute concentration × confiance)
 
-**Code clé :** `highlight_plus/analysis/enhanced_detector.py`
+**Détection Multi-Fuites** :
+- Méthode `estimate_all_leak_positions(min_probability=0.75, min_distance=5.0)`
+- Extraction de toutes les positions avec probabilité GP ≥ 75% (seuil strict)
+- Clustering manuel : regroupe positions proches (< 5m)
+- Pour chaque groupe, garde la position avec la plus haute probabilité
+- Tri par probabilité décroissante
+- Maximum 5 positions détectées
+
+**Code clé :** 
+- `highlight_plus/analysis/enhanced_detector.py` - Détecteur amélioré
+- `highlight_plus/analysis/methane_leak_validator.py` - Validateur GP
 
 ### 4. Environnement de Simulation
 
@@ -439,28 +780,36 @@ Le système inclut un **validateur de performance** (`performance_validator.py`)
 
 **Fonctionnalités :**
 1. **Comparaison automatique** :
-   - Position réelle vs position détectée
-   - Calcul distance euclidienne
-   - Calcul angle d'erreur
+   - Position réelle vs position détectée (meilleure position avec probabilité GP la plus élevée)
+   - Calcul distance euclidienne : `error_distance = ||position_réelle - position_détectée||`
+   - Calcul angle d'erreur : `error_angle = arccos(dot_product / (||v1|| × ||v2||))`
 
 2. **Vérification de tolérance** :
    - Rayon par défaut : 10 m
    - Configurable : 5-20 m
-   - Flag `is_within_tolerance`
+   - Flag `is_within_tolerance` : `error_distance ≤ tolerance_radius`
 
 3. **Métriques temporelles** :
-   - Temps de première détection
-   - Temps de convergence
-   - Durée totale de mission
+   - Temps de première détection : `first_detection_time` (s)
+   - Étape de première détection : `first_detection_step`
+   - Temps de convergence : `convergence_time` (s) - temps où erreur < tolérance
+   - Durée totale de mission : `total_time = step_count × time_step`
 
 4. **Estimation robuste** :
-   - Filtrage des outliers (Z-score, distance médiane)
-   - Moyenne pondérée par concentration
-   - Validation statistique
+   - Utilise le Validateur GP en priorité (probabilité GP)
+   - Fallback sur méthode statistique si GP non disponible
+   - Filtrage des outliers (clustering spatial, distance médiane)
+   - Moyenne pondérée par concentration, confiance, récence et cohérence
 
-5. **Génération de rapports** :
+5. **Score global de performance** :
+   - Calcul : `Score = 0.4 × Score_Détection + 0.4 × Score_Localisation + 0.2 × Score_Efficacité`
+   - Score de Détection : `0.5 × Score_Rapidité + 0.5 × Score_Taux`
+   - Score de Localisation : `100 × (1 - erreur / tolérance)` si erreur ≤ tolérance
+   - Score d'Efficacité : `min(100, 100 × (100 / énergie_par_détection))`
+
+6. **Génération de rapports** :
    - Format JSON structuré
-   - Métriques complètes
+   - Métriques complètes (détection, localisation, efficacité)
    - Exportable pour analyse
 
 **Code clé :** `highlight_plus/analysis/performance_validator.py`
@@ -633,30 +982,64 @@ Le système inclut un **validateur de performance** (`performance_validator.py`)
 ### Fichiers Clés du Projet
 
 1. **Modèles IA :**
-   - `highlight_plus/models/teacher_gp.py` - Expert (Processus Gaussiens, 459 lignes)
-   - `highlight_plus/models/student_rl.py` - Apprenti (RL + Distillation, 463 lignes)
+   - `highlight_plus/models/teacher_gp.py` - Expert (Processus Gaussiens, ~615 lignes)
+     - Fonction d'acquisition UCB améliorée avec poids adaptatifs
+     - Stratégie multi-niveaux pour sélection de point
+     - Résolution de grille adaptative
+   - `highlight_plus/models/student_rl.py` - Apprenti (RL + Distillation, ~489 lignes)
+     - Exploration guidée par Teacher
+     - Décroissance adaptative d'epsilon
+     - Distillation de connaissance avec perte KL
 
 2. **Détection :**
-   - `highlight_plus/analysis/enhanced_detector.py` - Détecteur multi-critères (277 lignes)
-   - `highlight_plus/analysis/performance_validator.py` - Validation de performance (513 lignes)
+   - `highlight_plus/analysis/enhanced_detector.py` - Détecteur multi-critères (~558 lignes)
+     - Validation multi-critères (concentration, confiance, progression, distance)
+     - Intégration avec Validateur GP
+     - Estimation statistique robuste (fallback)
+     - Détection multi-fuites
+   - `highlight_plus/analysis/methane_leak_validator.py` - Validateur GP (~415 lignes)
+     - Modélisation GP séparée pour estimation de position
+     - Score combiné : 70% concentration + 30% confiance
+     - Détection multi-fuites avec clustering
+     - Carte de confiance GP
+   - `highlight_plus/analysis/performance_validator.py` - Validation de performance (~513 lignes)
+     - Comparaison position réelle vs détectée
+     - Calcul de métriques complètes
+     - Génération de rapports
 
 3. **Simulation :**
-   - `highlight_plus/simulation/environment.py` - Environnement Gymnasium (439 lignes)
+   - `highlight_plus/simulation/environment.py` - Environnement Gymnasium (~657 lignes)
+     - Observation space : 16 dimensions
+     - Action space : 3 dimensions normalisées [-1, 1]
+     - Fonction de récompense éco-informative
+     - Calcul de consommation énergétique
    - `highlight_plus/simulation/plume_model.py` - Modèle de panache (200+ lignes)
+     - Modèle Gaussien 2D d'advection-diffusion
+     - Calcul de gradient
    - `highlight_plus/sensors/tdlas_sensor.py` - Capteur TDLAS (200+ lignes)
+     - Modèle de bruit réaliste
+     - Loi de Beer-Lambert
 
 4. **Analyse :**
    - `highlight_plus/analysis/learning_analysis.py` - Analyse de l'apprentissage (352 lignes)
-   - `VALIDATION_PERFORMANCE.md` - Documentation de validation (243 lignes)
+     - Visualisation des courbes d'apprentissage
+     - Métriques d'entraînement
 
 5. **Tests et Expérimentations :**
    - `highlight_plus/experiments/run_comparison.py` - Comparaisons expérimentales (528 lignes)
+     - Comparaison Teacher vs Student vs Baselines
    - `highlight_plus/experiments/leak_position_test.py` - Tests de robustesse
-   - `rapport_performance.txt` - Résultats de performance
+     - Tests sur multiples positions de fuite
+   - `demo_results/comparison_results.json` - Résultats de performance
 
 6. **Interface :**
    - `streamlit_app.py` - Application Streamlit complète (3100+ lignes)
+     - Interface de configuration
+     - Simulation en temps réel
+     - Visualisations interactives
+     - Comparaison Naïve vs HIGHLIGHT+
    - `demo.py` - Démonstrations
+   - `launch_app.py` - Lanceur de l'application
 
 ### Bibliothèques Utilisées
 
@@ -679,53 +1062,174 @@ Le système inclut un **validateur de performance** (`performance_validator.py`)
 
 ##  Flux de Données et Architecture Système
 
-### Flux Complet d'Exécution
+### Flux Complet d'Exécution avec Détails
 
 ```
-1. Configuration
+1. CONFIGURATION
+   ├─ Paramètres panache : leak_x, leak_y, intensity, wind_speed, wind_direction
+   ├─ Paramètres capteur : detection_threshold, noise_level, range_max/min
+   ├─ Paramètres drone : initial_x, initial_y, initial_altitude, max_speed
+   └─ Paramètres IA : simulation_mode, max_steps, hyperparamètres
    ↓
-2. Initialisation Environnement
-   ├─ Modèle de panache (position, intensité)
-   ├─ Capteur TDLAS (seuil, bruit)
-   └─ Drone (position initiale, contraintes)
+2. INITIALISATION ENVIRONNEMENT
+   ├─ Création MethanePlume avec PlumeConfig
+   │  └─ Calcul vecteur vent : u = (wind_speed × cos(dir), wind_speed × sin(dir))
+   ├─ Création TDLASSensor avec TDLASConfig
+   │  └─ Initialisation bruit : σ_noise = noise_level
+   ├─ Création MethaneDetectionEnv avec EnvironmentConfig
+   │  ├─ Observation space : Box(16,) [-1, 1]
+   │  ├─ Action space : Box(3,) [-1, 1]
+   │  └─ Position initiale : drone_position = [initial_x, initial_y, initial_altitude]
+   └─ Création EnhancedDetector avec MethaneLeakValidator
+      └─ GP Validator : kernel RBF(length_scale=5.0), threshold_prob=0.95
    ↓
-3. Initialisation IA
-   ├─ Teacher (GP avec kernel RBF)
-   └─ Student (Réseau RL, optionnel)
+3. INITIALISATION IA (selon mode)
+   ├─ Mode Simple : Aucune IA
+   ├─ Mode Teacher : 
+   │  └─ GaussianProcessTeacher(config, world_bounds)
+   │     └─ GP : kernel = ConstantKernel(1.0) × RBF(10.0) + WhiteKernel(1e-3)
+   └─ Mode Teacher-Student :
+      ├─ GaussianProcessTeacher (comme ci-dessus)
+      └─ StudentRL(state_dim=16, action_dim=3, config, teacher)
+         ├─ Policy Network : [16→256→256→128→3]
+         ├─ Target Network : Copie de Policy Network
+         └─ Replay Buffer : Capacité 10,000
    ↓
-4. Boucle de Simulation (max_steps)
-   ├─ Observation (état 16D)
-   ├─ Sélection Action
-   │  ├─ Teacher: select_next_point() → (x, y)
-   │  └─ Student: select_action(state) → [Δx, Δy, Δz]
-   ├─ Step Environnement
-   │  ├─ Mise à jour position
-   │  ├─ Calcul concentration (modèle panache)
-   │  ├─ Mesure capteur (avec bruit)
-   │  └─ Calcul récompense
-   ├─ Mise à jour Teacher
-   │  └─ add_observation(x, y, concentration)
-   ├─ Mise à jour Student (si actif)
-   │  ├─ store_experience(s, a, r, s', done)
-   │  └─ learn() (si buffer > 1000)
-   ├─ Détection
-   │  └─ enhanced_detector.validate_detection()
-   │     └─ gp_validator.add_measurement() (accumulation mesures)
-   └─ Validation
-      └─ validator.add_detection()
+4. BOUCLE DE SIMULATION (pour step = 0 à max_steps)
+   │
+   ├─ ÉTAPE 1 : OBSERVATION
+   │  ├─ Récupération état actuel : position, vitesse, mesures
+   │  ├─ Calcul gradient : grad_x, grad_y = plume.gradient(x, y, time)
+   │  ├─ Prédiction GP (si Teacher disponible) :
+   │  │  ├─ X_pred = [[x, y]]
+   │  │  ├─ mean, std = teacher.gp.predict(X_pred, return_std=True)
+   │  │  └─ gp_prediction = mean[0], gp_uncertainty = std[0]
+   │  └─ Construction observation 16D :
+   │     └─ obs = [x_norm, y_norm, z_norm, vx_norm, vy_norm, vz_norm,
+   │               conc_norm, detected, grad_x_norm, grad_y_norm,
+   │               wind_x_norm, wind_y_norm, snr_norm,
+   │               gp_pred_norm, gp_unc_norm, time_norm]
+   │
+   ├─ ÉTAPE 2 : SÉLECTION ACTION
+   │  ├─ Mode Simple :
+   │  │  └─ Navigation multi-phase basée sur distance et gradient
+   │  ├─ Mode Teacher :
+   │  │  ├─ next_x, next_y = teacher.select_next_point(current_x, current_y, ...)
+   │  │  ├─ Calcul direction : dir = (next - current) / ||next - current||
+   │  │  └─ Action : action = [dir_x, dir_y, 0.0] normalisé [-1, 1]
+   │  └─ Mode Teacher-Student :
+   │     ├─ teacher_dir = teacher.select_next_point(...) → direction 2D
+   │     ├─ student_action = student.select_action(obs, teacher_guidance=teacher_dir)
+   │     ├─ Calcul confiance Student : confidence = max(0, min(1, 1 - avg_loss/0.5))
+   │     ├─ Poids adaptatifs :
+   │     │  ├─ teacher_weight = 0.8 - (0.5 × confidence)
+   │     │  └─ student_weight = 0.2 + (0.5 × confidence)
+   │     └─ Action finale : action = teacher_weight × teacher_dir + student_weight × student_action
+   │
+   ├─ ÉTAPE 3 : EXÉCUTION ENVIRONNEMENT
+   │  ├─ Conversion action → déplacement :
+   │  │  └─ displacement = action × max_speed × time_step
+   │  ├─ Mise à jour position :
+   │  │  └─ drone_position += displacement
+   │  ├─ Application contraintes :
+   │  │  ├─ drone_position[0] = clip(drone_position[0], 0, world_width)
+   │  │  ├─ drone_position[1] = clip(drone_position[1], 0, world_height)
+   │  │  └─ drone_position[2] = clip(drone_position[2], min_altitude, max_altitude)
+   │  ├─ Calcul vitesse : drone_velocity = (new_pos - old_pos) / time_step
+   │  ├─ Calcul concentration réelle :
+   │  │  └─ concentration = plume.concentration(x, y, time)
+   │  ├─ Mesure capteur (avec bruit) :
+   │  │  └─ measured_conc, detected = sensor.measure_at_position(x, y, z, concentration)
+   │  ├─ Calcul gradient : grad_x, grad_y = plume.gradient(x, y, time)
+   │  ├─ Calcul récompense éco-informative :
+   │  │  ├─ information_gain = 1.0 / (1.0 + gp_uncertainty) si GP disponible
+   │  │  ├─ energy_cost = base_power + c₁×v_air³ + c₂×|dh/dt|
+   │  │  └─ reward = α×information_gain - β×energy_cost + detection_bonus - boundary_penalty
+   │  └─ Vérification terminaison : terminated ou truncated
+   │
+   ├─ ÉTAPE 4 : MISE À JOUR TEACHER
+   │  └─ teacher.add_observation(x, y, measured_conc)
+   │     └─ _update_gp() : Réentraînement GP avec toutes observations
+   │
+   ├─ ÉTAPE 5 : MISE À JOUR STUDENT (si mode Teacher-Student)
+   │  ├─ student.store_experience(state, action, reward, next_state, done)
+   │  │  └─ replay_buffer.push(...)
+   │  └─ Si len(replay_buffer) >= learning_starts (1000) :
+   │     ├─ student.learn()
+   │     │  ├─ Échantillonnage batch de 64 expériences
+   │     │  ├─ Calcul perte RL : L_RL = MSE(Q_current, Q_target)
+   │     │  ├─ Calcul perte KL : L_KL = MSE(π_teacher, π_student) (toutes les 10 steps)
+   │     │  ├─ Perte totale : L = L_RL + λ×L_KL
+   │     │  ├─ Backward pass + gradient clipping
+   │     │  └─ Optimiseur.step()
+   │     └─ Si step_count % target_update_freq (100) == 0 :
+   │        └─ target_net.load_state_dict(policy_net.state_dict())
+   │
+   ├─ ÉTAPE 6 : DÉTECTION
+   │  └─ detection = enhanced_detector.validate_detection(
+   │       position, measured_conc, real_conc, step, time, gradient)
+   │     ├─ Calcul confiance : confidence = 0.3×quality + 0.3×distance + 0.2×gradient + 0.2×progression
+   │     ├─ Validation : is_valid = (confidence ≥ 0.6) OR (progression AND distance < 30m) OR ...
+   │     └─ Si validé :
+   │        └─ gp_validator.add_measurement((x, y), measured_conc)
+   │           └─ _update_gp() : Réentraînement GP Validator
+   │
+   └─ ÉTAPE 7 : VALIDATION (toutes les 5 steps)
+      └─ Si détection validée :
+         └─ performance_validator.add_detection(position, time, step)
    ↓
-5. Calcul Métriques Finales
-   ├─ performance_validator.compute_metrics()
-   ├─ enhanced_detector.estimate_leak_position()
-   │  ├─ gp_validator.get_leak_position() (priorité)
-   │  └─ _estimate_position_statistical() (fallback)
-   └─ Génération rapport
+5. CALCUL MÉTRIQUES FINALES
+   ├─ Estimation position de fuite :
+   │  ├─ PRIORITÉ 1 : gp_validator.get_leak_position()
+   │  │  ├─ Prédiction GP sur grille fine (150×150 ou 100×100)
+   │  │  ├─ Calcul score combiné : 0.7×concentration + 0.3×confidence
+   │  │  ├─ Application pénalité incertitude relative
+   │  │  └─ Retour position avec probabilité GP
+   │  └─ PRIORITÉ 2 : enhanced_detector._estimate_position_statistical()
+   │     ├─ Clustering spatial des détections
+   │     ├─ Filtrage outliers
+   │     ├─ Calcul poids : concentration × confidence × temporal × coherence
+   │     └─ Médiane pondérée : 70% robuste + 30% moyenne
+   ├─ performance_validator.compute_metrics(true_position, detected_position)
+   │  ├─ Calcul erreur distance : error = ||true_pos - detected_pos||
+   │  ├─ Calcul erreur angle : error_angle = arccos(dot_product / (||v1|| × ||v2||))
+   │  ├─ Vérification tolérance : is_within_tolerance = (error ≤ 10m)
+   │  └─ Calcul score global : 0.4×Score_Détection + 0.4×Score_Localisation + 0.2×Score_Efficacité
+   └─ Génération rapport JSON avec toutes métriques
    ↓
-6. Affichage Résultats
-   ├─ Métriques de performance
-   ├─ Visualisations
-   └─ Export JSON
+6. AFFICHAGE RÉSULTATS
+   ├─ Métriques de performance (détection, localisation, efficacité)
+   ├─ Visualisations (trajectoire, carte GP, positions détectées)
+   └─ Export JSON pour analyse ultérieure
 ```
+
+### Exemple Concret d'Exécution (3 Steps)
+
+**Configuration initiale :**
+- Fuite : (50, 50), intensité 0.1 kg/s
+- Drone initial : (10, 10), altitude 5m
+- Mode : Teacher-Student
+
+**Step 0 :**
+- Position : (10, 10, 5)
+- Concentration mesurée : 0.001 kg/m³ (loin de la fuite)
+- Teacher : Pas encore d'observations → navigation vers cible estimée
+- Student : Buffer vide → exploration guidée par Teacher
+- Action : [0.8, 0.6, 0.0] → déplacement (0.4, 0.3, 0) m
+
+**Step 1 :**
+- Position : (10.4, 10.3, 5)
+- Concentration mesurée : 0.002 kg/m³
+- Teacher : 1 observation → GP non encore entraîné (besoin de 2)
+- Student : 1 expérience stockée
+- Action : [0.7, 0.7, 0.0] → déplacement (0.35, 0.35, 0) m
+
+**Step 2 :**
+- Position : (10.75, 10.65, 5)
+- Concentration mesurée : 0.003 kg/m³
+- Teacher : 2 observations → GP entraîné, prédiction disponible
+- Student : 2 expériences stockées
+- Action : [0.6, 0.8, 0.0] → déplacement (0.3, 0.4, 0) m
 
 ### Architecture Logicielle
 
