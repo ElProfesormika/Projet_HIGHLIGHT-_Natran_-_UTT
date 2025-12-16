@@ -2129,5 +2129,5 @@ Score = min(100, 100 × (100 / énergie_par_détection))
 ---
 
 *Projet : HIGHLIGHT+ - Concours Innovation Natran x UTT*  
-*Version : 2.0 - Analyse Complète avec Formules Détaillées*  
+*Version : 1.0 - Analyse Complète avec Formules Détaillées*  
 *Dernière mise à jour : 2024*
